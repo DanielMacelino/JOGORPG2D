@@ -1,0 +1,32 @@
+# Godot generated cache and local export credentials
+.godot/
+
+# Generated game packages and build logs
+builds/
+*.log
+
+# Local editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local secrets and signing certificates
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+export_credentials.cfg
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local player progress
+ashenwild_save.json
+ashenwild_save.json.*

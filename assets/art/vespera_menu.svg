@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs>
+  <linearGradient id="night" x2="0" y2="1"><stop stop-color="#10191d"/><stop offset=".48" stop-color="#182a2b"/><stop offset="1" stop-color="#101c1d"/></linearGradient>
+  <radialGradient id="clearing"><stop stop-color="#937744" stop-opacity=".34"/><stop offset=".35" stop-color="#45513c" stop-opacity=".2"/><stop offset="1" stop-color="#111b1d" stop-opacity="0"/></radialGradient>
+  <linearGradient id="mist" x2="0" y2="1"><stop stop-color="#bfd0ac" stop-opacity="0"/><stop offset=".58" stop-color="#b2c09c" stop-opacity=".09"/><stop offset="1" stop-color="#b2c09c" stop-opacity="0"/></linearGradient>
+  <linearGradient id="bark" x2="1"><stop stop-color="#182324"/><stop offset=".32" stop-color="#34433a"/><stop offset=".66" stop-color="#202e2b"/><stop offset="1" stop-color="#121d20"/></linearGradient>
+  <linearGradient id="barklight" x2="1"><stop stop-color="#586247" stop-opacity=".05"/><stop offset=".5" stop-color="#9d9665" stop-opacity=".3"/><stop offset="1" stop-color="#273532" stop-opacity=".04"/></linearGradient>
+</defs>
+<rect width="1600" height="900" fill="url(#night)"/>
+<ellipse cx="830" cy="490" rx="680" ry="460" fill="url(#clearing)"/>
+<circle cx="1215" cy="168" r="74" fill="#ddcda0" opacity=".13"/>
+<circle cx="1215" cy="168" r="53" fill="#e5d7b2" opacity=".17"/>
+<path d="M0 505 Q165 402 320 479 T638 470 Q792 385 937 458 T1255 430 Q1420 390 1600 492 V720 H0Z" fill="#253833" opacity=".76"/>
+<path d="M0 587 Q203 499 401 567 T775 543 Q976 473 1185 558 T1600 532 V773 H0Z" fill="#1a2c2a"/>
+<path d="M0 602 C238 559 395 614 591 574 S946 584 1111 558 S1412 583 1600 548 V750 H0Z" fill="url(#mist)"/>
+<!-- distant standing stones -->
+<path d="M608 566 L622 457 Q638 426 653 460 L667 566Z" fill="#34413a" opacity=".7"/>
+<path d="M685 574 L694 481 Q709 455 723 485 L734 570Z" fill="#293a36" opacity=".68"/>
+<path d="M648 496 Q667 474 690 497" fill="none" stroke="#a88e59" stroke-opacity=".35" stroke-width="3"/>
+<path d="M624 521 Q665 505 716 524" fill="none" stroke="#a88e59" stroke-opacity=".2" stroke-width="2"/>
+<!-- left old tree -->
+<path d="M-68 900 C26 748 72 628 42 514 C21 429 66 346 32 266 C-2 188 28 82 152 -28 L281 -32 C168 82 178 170 244 242 C311 315 285 411 235 493 C184 576 241 675 322 900Z" fill="url(#bark)"/>
+<path d="M-13 900 C75 758 116 655 83 547 C59 464 105 367 75 292 C42 210 80 126 164 49" fill="none" stroke="url(#barklight)" stroke-width="28"/>
+<path d="M92 497 C176 441 232 366 291 281 C347 201 413 159 507 138 C415 209 374 286 331 365 C282 456 205 531 129 566" fill="#202f2d"/>
+<path d="M189 384 C248 315 275 229 285 143 C290 83 331 20 388 -14" fill="none" stroke="#303e34" stroke-width="27"/>
+<!-- right old tree -->
+<path d="M1675 900 C1561 765 1518 644 1551 521 C1576 431 1513 358 1550 264 C1584 179 1536 89 1432 -20 L1327 -28 C1439 88 1415 187 1351 260 C1286 334 1319 429 1362 507 C1407 590 1347 696 1284 900Z" fill="url(#bark)"/>
+<path d="M1621 900 C1534 761 1494 652 1528 545 C1554 459 1508 368 1538 291 C1573 203 1535 121 1460 40" fill="none" stroke="url(#barklight)" stroke-width="25"/>
+<path d="M1495 493 C1404 429 1364 352 1316 273 C1267 194 1198 149 1098 127 C1189 198 1228 277 1270 361 C1315 451 1382 525 1460 560" fill="#1c2b2a"/>
+<path d="M1394 367 C1330 290 1310 210 1296 125 C1287 67 1246 15 1190 -21" fill="none" stroke="#303e34" stroke-width="25"/>
+<!-- canopy silhouettes -->
+<path d="M0 150 Q58 96 122 130 Q168 43 249 76 Q314 14 393 74 Q472 23 525 107 Q612 70 670 133 L638 217 Q539 191 455 226 Q375 190 304 236 Q214 200 144 250 Q73 209 0 255Z" fill="#1c302b"/>
+<path d="M1600 164 Q1533 98 1479 133 Q1433 39 1358 76 Q1290 12 1215 74 Q1134 20 1081 109 Q991 70 936 138 L968 218 Q1070 191 1151 227 Q1235 191 1303 236 Q1390 201 1461 250 Q1535 211 1600 258Z" fill="#1b2e2b"/>
+<path d="M0 74 Q92 38 162 81 Q225 16 289 51 Q354 -2 434 45 Q506 12 563 73 L537 126 Q444 99 379 140 Q296 99 222 145 Q130 111 61 162 L0 150Z" fill="#243a32" opacity=".82"/>
+<path d="M1600 80 Q1504 40 1441 84 Q1374 12 1314 53 Q1242 -4 1162 45 Q1091 14 1035 75 L1064 127 Q1152 102 1223 141 Q1308 99 1380 147 Q1472 111 1537 164 L1600 151Z" fill="#243a32" opacity=".82"/>
+<!-- fine bark seams and roots -->
+<g fill="none" stroke="#90906a" stroke-opacity=".25" stroke-width="3">
+ <path d="M89 852 Q151 755 125 681 T141 548 M204 844 Q179 747 235 672 T234 545 M150 287 Q204 345 163 420 M1399 844 Q1435 758 1407 683 T1427 551 M1512 840 Q1486 749 1535 672 T1534 543 M1464 287 Q1408 342 1454 419"/>
+ <path d="M60 900 Q177 827 282 900 M1334 900 Q1460 822 1573 900"/>
+</g>
+<!-- moss seams and root lines in the foreground -->
+<path d="M0 740 Q222 702 394 758 T757 750 Q986 700 1202 765 T1600 724 V900 H0Z" fill="#152423" opacity=".76"/>
+<g fill="none" stroke-linecap="round">
+ <path d="M0 821 Q207 773 351 819 T648 818 Q776 783 879 811" stroke="#647052" stroke-opacity=".22" stroke-width="5"/>
+ <path d="M1600 821 Q1402 773 1249 819 T956 818 Q850 785 759 811" stroke="#647052" stroke-opacity=".2" stroke-width="5"/>
+ <path d="M111 882 Q212 828 320 866 M1410 883 Q1312 830 1200 867 M507 899 Q574 863 641 889 M1090 900 Q1029 862 952 890" stroke="#a58a56" stroke-opacity=".2" stroke-width="3"/>
+</g>
+<!-- drifting firefly lights -->
+<g fill="#e5bd70">
+ <circle cx="352" cy="404" r="2.4" opacity=".65"/><circle cx="402" cy="362" r="1.5" opacity=".44"/>
+ <circle cx="1189" cy="370" r="2" opacity=".57"/><circle cx="1247" cy="426" r="1.5" opacity=".5"/>
+ <circle cx="993" cy="309" r="1.6" opacity=".47"/><circle cx="510" cy="520" r="1.8" opacity=".6"/>
+ <circle cx="1092" cy="584" r="1.5" opacity=".55"/><circle cx="294" cy="622" r="1.7" opacity=".53"/>
+</g>
+<g fill="none" stroke="#cfaf69" stroke-opacity=".22" stroke-width="2">
+ <path d="M698 611 Q799 578 900 611"/><path d="M735 626 Q800 606 866 626"/>
+ <path d="M754 645 l12 -13 l12 13 l-12 13Z M827 645 l12 -13 l12 13 l-12 13Z"/>
+</g>
+</svg>

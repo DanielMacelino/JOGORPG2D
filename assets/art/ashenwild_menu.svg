@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<defs>
+  <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#101a29"/><stop offset=".54" stop-color="#242b39"/><stop offset="1" stop-color="#111719"/></linearGradient>
+  <linearGradient id="dusk" x2="0" y2="1"><stop stop-color="#d39058" stop-opacity=".2"/><stop offset="1" stop-color="#d39058" stop-opacity="0"/></linearGradient>
+  <linearGradient id="paper" x2="0" y2="1"><stop stop-color="#e8c995"/><stop offset=".45" stop-color="#d8b77f"/><stop offset="1" stop-color="#c7a36b"/></linearGradient>
+  <linearGradient id="wood" x2="0" y2="1"><stop stop-color="#35251d"/><stop offset=".5" stop-color="#1d1714"/><stop offset="1" stop-color="#39251b"/></linearGradient>
+  <linearGradient id="redcloth" x2="0" y2="1"><stop stop-color="#853522"/><stop offset="1" stop-color="#4d1d18"/></linearGradient>
+  <radialGradient id="moonlight"><stop stop-color="#ffe0a0" stop-opacity=".8"/><stop offset="1" stop-color="#f6ad5b" stop-opacity="0"/></radialGradient>
+</defs>
+
+<!-- blue hour over the forest -->
+<rect width="1600" height="900" fill="url(#sky)"/>
+<rect y="108" width="1600" height="360" fill="url(#dusk)"/>
+<circle cx="1318" cy="91" r="105" fill="url(#moonlight)"/>
+<circle cx="1318" cy="91" r="38" fill="#f3c879" opacity=".92"/>
+<path d="M0 349 Q155 245 315 318 T620 297 Q812 211 1002 302 T1320 282 Q1466 236 1600 300 V650 H0Z" fill="#18222a"/>
+<path d="M0 408 Q170 323 345 381 T690 351 Q876 306 1040 366 T1370 342 Q1512 310 1600 366 V700 H0Z" fill="#111b20"/>
+
+<!-- distant castle and its warm windows -->
+<g fill="#171b23" stroke="#10151b" stroke-width="8" stroke-linejoin="round">
+  <path d="M1082 295 L1094 166 L1124 166 L1131 133 L1162 166 L1187 166 L1194 112 L1222 63 L1251 112 L1253 166 L1280 166 L1287 136 L1317 166 L1344 166 L1360 295Z"/>
+  <path d="M1202 228 L1211 103 L1237 103 L1243 74 L1267 103 L1292 103 L1299 44 L1325 12 L1351 44 L1355 103 L1382 103 L1389 74 L1414 103 L1437 103 L1449 236Z"/>
+  <path d="M1004 298 L1014 218 L1032 218 L1038 194 L1058 218 L1075 218 L1080 298Z"/>
+  <path d="M1388 260 L1397 191 L1415 191 L1420 169 L1440 191 L1460 191 L1465 260Z"/>
+</g>
+<g fill="#e6a54f" opacity=".9">
+  <path d="M1150 205h12v26h-12z M1181 205h12v26h-12z M1230 198h13v29h-13z M1263 198h13v29h-13z"/>
+  <path d="M1284 109h12v25h-12z M1313 109h12v25h-12z M1350 108h12v25h-12z M1381 108h12v25h-12z"/>
+  <path d="M1032 248h10v19h-10z M1055 248h10v19h-10z M1419 214h10v19h-10z M1440 214h10v19h-10z"/>
+</g>
+<path d="M1015 301 Q1200 274 1456 286 L1532 466 H960Z" fill="#e08c3c" opacity=".08"/>
+
+<!-- dark fir silhouettes frame the parchment -->
+<g fill="#0d1719">
+  <path d="M0 0h82l-12 122 39-28-30 83 48-29-42 99 60-34-54 119 63-28-70 138H0Z"/>
+  <path d="M1600 0h-74l10 116-41-28 31 80-50-27 42 97-59-34 53 111-62-24 72 139h78Z"/>
+  <path d="M67 0h42l-9 125 31-20-28 67 38-20-38 76 48-21-53 110 49-16-50 103H67Z" opacity=".75"/>
+  <path d="M1534 0h-44l10 119-34-19 27 68-37-20 37 76-45-21 49 105-45-16 48 104h34Z" opacity=".8"/>
+</g>
+<g fill="none" stroke="#43513e" stroke-width="8" opacity=".55">
+  <path d="M28 0 Q126 42 91 133 T111 268 M1568 0 Q1470 42 1504 133 T1481 265"/>
+</g>
+
+<!-- side standards -->
+<path d="M40 206h75v229l-37 47-38-47Z" fill="#5d241c" stroke="#a77a3c" stroke-width="5"/>
+<path d="M55 222h45v180l-22 27-23-27Z" fill="#8a3724"/>
+<path d="M77 258l8 22 23 1-18 14 7 22-20-13-19 13 7-22-18-14 23-1Z" fill="#c4994e" opacity=".9"/>
+<path d="M1484 248h76v275l-38 49-38-49Z" fill="#54221a" stroke="#a77a3c" stroke-width="5"/>
+<path d="M1499 264h46v220l-23 30-23-30Z" fill="#8d3926"/>
+<path d="M1522 324l7 20 22 1-17 13 7 21-19-12-18 12 7-21-17-13 22-1Z" fill="#d1a65d" opacity=".9"/>
+
+<!-- torch bowls and ember flames -->
+<g stroke="#57402a" stroke-width="11" stroke-linejoin="round">
+  <path d="M26 509h121l-17 27H42Z" fill="#25201c"/><path d="M48 536h77l17 25H31Z" fill="#392b20"/><path d="M58 561h58l-10 61H69Z" fill="#25201c"/><path d="M41 622h92l-12 17H53Z" fill="#403023"/>
+  <path d="M1453 539h121l-17 27h-88Z" fill="#25201c"/><path d="M1474 566h77l17 25h-111Z" fill="#392b20"/><path d="M1485 591h58l-10 61h-37Z" fill="#25201c"/><path d="M1468 652h92l-12 17h-68Z" fill="#403023"/>
+</g>
+<path d="M59 507 Q39 469 70 424 Q76 461 91 473 Q103 438 104 415 Q138 466 110 507Z" fill="#e27b2e"/>
+<path d="M72 506 Q62 476 88 447 Q87 478 102 488 Q107 464 112 454 Q127 483 105 506Z" fill="#ffd36f"/>
+<path d="M1481 537 Q1461 499 1492 454 Q1498 491 1513 503 Q1525 468 1526 445 Q1560 496 1532 537Z" fill="#e27b2e"/>
+<path d="M1494 536 Q1484 506 1510 477 Q1509 508 1524 518 Q1529 494 1534 484 Q1549 513 1527 536Z" fill="#ffd36f"/>
+
+<!-- carved parchment frame -->
+<path d="M108 190 L1492 190 L1501 205 L1495 727 L1480 739 L124 739 L108 725Z" fill="#100f10" stroke="#715332" stroke-width="9"/>
+<path d="M119 202 L1480 202 L1488 211 L1482 716 L1472 726 L132 726 L119 715Z" fill="url(#paper)" stroke="#d3a45b" stroke-width="4"/>
+<path d="M127 211 L1472 211 L1479 218 L1474 708 L1467 716 L138 716 L127 707Z" fill="none" stroke="#694828" stroke-width="2" opacity=".72"/>
+<g fill="none" stroke="#775632" stroke-width="2" opacity=".24">
+  <path d="M143 255 Q170 226 192 243 Q180 263 154 266 M143 255 Q159 277 185 276 M1448 255 Q1421 226 1399 243 Q1411 263 1437 266 M1448 255 Q1432 277 1406 276"/>
+  <path d="M143 666 Q170 695 192 678 Q180 658 154 655 M143 666 Q159 644 185 645 M1448 666 Q1421 695 1399 678 Q1411 658 1437 655 M1448 666 Q1432 644 1406 645"/>
+  <path d="M236 218l26 11-19 20-18-18z M1360 218l-26 11 19 20 18-18z M236 706l26-11-19-20-18 18z M1360 706l-26-11 19-20 18 18z"/>
+  <path d="M318 238q18-17 36 0t36 0 M1190 678q18-17 36 0t36 0 M285 681q15-13 30 0t30 0"/>
+</g>
+<!-- subtle illustrated forest watermark in the paper -->
+<g fill="#665a3f" opacity=".105">
+  <path d="M925 689 Q966 596 951 512 Q940 448 984 388 Q1014 345 1008 276 Q1066 326 1057 388 Q1047 441 1083 474 Q1117 503 1091 565 Q1071 620 1127 689Z"/>
+  <path d="M1060 459 Q1121 421 1144 365 Q1160 327 1207 305 Q1173 353 1173 396 Q1174 443 1136 489Z"/>
+  <path d="M1321 689 Q1282 606 1302 535 Q1316 489 1280 435 Q1254 395 1263 342 Q1214 389 1224 439 Q1234 482 1202 507 Q1172 532 1195 586 Q1213 635 1166 689Z"/>
+  <path d="M1341 482 Q1286 448 1274 400 Q1263 366 1228 345 Q1267 388 1255 426 Q1247 454 1283 494Z"/>
+</g>
+<g fill="#6d5636" opacity=".16">
+  <circle cx="284" cy="304" r="2"/><circle cx="303" cy="321" r="1.5"/><circle cx="376" cy="281" r="1.6"/><circle cx="851" cy="310" r="2"/>
+  <circle cx="781" cy="683" r="1.7"/><circle cx="458" cy="686" r="2"/><circle cx="1380" cy="317" r="2"/><circle cx="916" cy="668" r="1.6"/>
+</g>
+
+<!-- title treatment -->
+<g fill="#10141a" stroke="#d4a653" stroke-width="2">
+  <path d="M164 57h103v6H164z M471 57h103v6H471z"/>
+  <path d="M363 46l10-15 10 15 15 4-15 5-10 14-10-14-15-5z"/>
+</g>
+<text x="161" y="113" fill="#f0d18d" stroke="#38291b" stroke-width="2" paint-order="stroke" font-family="Georgia, 'Times New Roman', serif" font-size="60" font-weight="bold" letter-spacing="3">ASHENWILD</text>
+<text x="180" y="144" fill="#eac77e" font-family="Georgia, 'Times New Roman', serif" font-size="19" font-weight="bold" letter-spacing="2">✦  CRÔNICAS DOS ERMOS  ✦</text>
+<path d="M173 164h145l8 5 8-5h93l8 5 8-5h117" fill="none" stroke="#d2a454" stroke-width="2" opacity=".8"/>
+
+<!-- compact resource plaque; live amounts are rendered by Godot -->
+<path d="M1368 23 L1570 23 L1580 34 L1580 98 L1569 108 L1367 108 L1357 97 L1357 34Z" fill="url(#wood)" stroke="#9b7540" stroke-width="4"/>
+<path d="M1370 30h197v70h-197z" fill="none" stroke="#5c452d" stroke-width="2"/>
+<path d="M1383 28v75 M1553 28v75" stroke="#bd9252" stroke-width="2" opacity=".65"/>
+<circle cx="1398" cy="52" r="12" fill="#e7b84f" stroke="#714d25" stroke-width="3"/>
+<path d="M1398 42l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#fff0a6"/>
+<path d="M1398 79l11 11-11 11-11-11z" fill="#9bdff1" stroke="#533c6d" stroke-width="3"/>
+<path d="M1398 82l3 5 5 3-5 3-3 5-3-5-5-3 5-3z" fill="#f4dcff"/>
+
+<!-- bottom timber navigation rail -->
+<path d="M34 773 L1567 773 L1584 789 L1580 862 L1564 877 L40 877 L23 862 L20 790Z" fill="url(#wood)" stroke="#100e0d" stroke-width="11"/>
+<path d="M37 780 L1562 780 L1573 791 L1570 855 L1559 867 L45 867 L32 854 L29 792Z" fill="none" stroke="#aa7c3e" stroke-width="4"/>
+<path d="M45 789h1510v68H45z" fill="none" stroke="#553b27" stroke-width="2"/>
+<path d="M289 790v66 M544 790v66 M799 790v66 M1054 790v66 M1309 790v66" stroke="#100d0c" stroke-width="4"/>
+<path d="M291 792v62 M546 792v62 M801 792v62 M1056 792v62 M1311 792v62" stroke="#876238" stroke-width="1.5" opacity=".72"/>
+<path d="M42 788 L275 788 L290 801 L287 848 L273 861 L43 861 L31 849 L31 801Z" fill="url(#redcloth)" stroke="#d1a04b" stroke-width="4"/>
+<path d="M49 796h219l10 9v37l-10 9H49l-9-9v-37z" fill="none" stroke="#4c241b" stroke-width="2"/>
+<g fill="#d9b263">
+  <path d="M800 770l11 12-11 12-11-12z M800 856l11 12-11 12-11-12z M25 823l12 10-12 10-12-10z M1576 823l12 10-12 10-12-10z"/>
+  <path d="M284 775l8 8-8 8-8-8z M1314 775l8 8-8 8-8-8z"/>
+</g>
+
+<!-- crates, shield and brush at the lower edges -->
+<g opacity=".95">
+  <path d="M1413 650h73v116h-73z" fill="#4c3323" stroke="#191412" stroke-width="9"/>
+  <path d="M1417 667h65 M1417 720h65 M1448 654v104" stroke="#9a6c38" stroke-width="8"/>
+  <path d="M1491 709h83v56h-83z" fill="#37261d" stroke="#171211" stroke-width="8"/>
+  <path d="M1495 724h76 M1518 713v49 M1549 713v49" stroke="#946434" stroke-width="6"/>
+  <circle cx="75" cy="733" r="78" fill="#241a15" stroke="#886137" stroke-width="13"/>
+  <circle cx="75" cy="733" r="57" fill="#161618" stroke="#503a29" stroke-width="6"/>
+  <path d="M75 680v106 M22 733h106 M38 696l74 74 M112 696l-74 74" stroke="#71512f" stroke-width="5"/>
+</g>
+<path d="M0 877 Q230 844 448 878 T850 878 T1250 875 T1600 880 V900 H0Z" fill="#090e10"/>
+</svg>
