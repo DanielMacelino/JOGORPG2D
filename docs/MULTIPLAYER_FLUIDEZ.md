@@ -1,6 +1,6 @@
 # Movimento e sincronizacao online
 
-Protocolo atual: ashenwild-coop-6. Todos os participantes precisam usar a mesma versao do jogo no proximo executavel. Esta alteracao nao exporta o jogo.
+Protocolo atual: ashenwild-coop-7. Todos os participantes precisam usar a mesma versao do jogo no proximo executavel. Esta alteracao nao exporta o jogo.
 
 ## Causas corrigidas
 

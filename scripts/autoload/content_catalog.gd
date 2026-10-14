@@ -116,7 +116,7 @@ func _configure_ability_pools() -> void:
 	var base_bonuses := {
 		"iron_will": {"defense": 2.0, "health_pct": 0.10}, "arcane_focus": {"damage_pct": 0.12},
 		"keen_eye": {"crit_chance": 0.08, "range_pct": 0.10}, "shadow_step": {"crit_chance": 0.08, "speed_pct": 0.08},
-		"holy_oath": {"defense": 2.0, "health_pct": 0.08}, "swift_feet": {"speed_pct": 0.08},
+		"holy_oath": {"defense": 2.0, "health_pct": 0.08}, "wild_growth": {"summon_duration": 1.0, "summon_damage_pct": 0.08}, "swift_feet": {"speed_pct": 0.08},
 		"vital_bloom": {"health_pct": 0.18}, "keen_edge": {"damage_pct": 0.16}, "iron_skin": {"defense": 3.0},
 		"hunters_pace": {"speed_pct": 0.06, "attack_speed_pct": 0.05}, "rapid_hands": {"attack_speed_pct": 0.16},
 		"lifesteal": {"lifesteal": 0.04}, "lucky_find": {"bonus_gold_xp": 0.20}}
@@ -158,6 +158,9 @@ func _configure_ability_pools() -> void:
 	_class_ability("oath_edge", "Peso do Juramento", "Dano +12% e velocidade de ataque +8% por escolha.", "uncommon", "paladin", {"damage_pct": 0.12, "attack_speed_pct": 0.08})
 	_class_ability("sunfire", "Arco Solar", "Golpe em área periódico. Cada nível soma dano e alcance.", "rare", "paladin")
 	_class_ability("restoring_light", "Luz Restauradora", "Vida máxima +8% e regeneração +0,6 de vida/s por escolha.", "uncommon", "paladin", {"health_pct": 0.08, "regen": 0.6})
+
+	for power_id in ["thorn_aura", "ember_orb", "frost_nova", "storm_arc", "blade_storm", "time_warp", "starfall", "void_rift", "challenge_shout", "glacial_ring", "volley", "shadow_burst", "ancient_guardian", "roots_snare", "sunfire"]:
+		abilities[power_id].active_power = true
 
 func _class_ability(id: String, title: String, description: String, rarity: String, owner: String, bonuses: Dictionary = {}) -> void:
 	_add_ability(id, title, description, rarity, {"bonuses": bonuses})
@@ -443,14 +446,14 @@ func _build_achievements() -> void:
 # ═══════════════════════════════════════════════════════════
 func _build_upgrades() -> void:
 	upgrades = [
-		{"id": "vitality", "name": "Sangue Antigo", "desc": "Vida máxima +5% por nível. Resistência que atravessa gerações.", "icon": "❤️", "base_cost": 80, "max_level": 10, "stat": "max_health_pct", "value_per_level": 0.05},
-		{"id": "might", "name": "Aço Temperado", "desc": "Dano inicial +4% por nível. Golpes que ecoam pela floresta.", "icon": "⚔️", "base_cost": 95, "max_level": 10, "stat": "damage_pct", "value_per_level": 0.04},
-		{"id": "fortune", "name": "Mão de Mercador", "desc": "Ouro e experiência +5% por nível. A sorte favorece os preparados.", "icon": "💰", "base_cost": 110, "max_level": 8, "stat": "fortune_pct", "value_per_level": 0.05},
-		{"id": "resilience", "name": "Pele de Pedra", "desc": "Defesa +1 por nível. Cada ponto reduz o dano recebido diretamente.", "icon": "🛡️", "base_cost": 120, "max_level": 8, "stat": "defense_flat", "value_per_level": 1.0},
-		{"id": "swiftness", "name": "Passos do Vento", "desc": "Velocidade de movimento +3% por nível. Velocidade é sobrevivência.", "icon": "💨", "base_cost": 90, "max_level": 10, "stat": "speed_pct", "value_per_level": 0.03},
-		{"id": "crit_mastery", "name": "Fio do Caos", "desc": "Chance de crítico +2% por nível. Todo golpe pode ser fatal.", "icon": "🎯", "base_cost": 130, "max_level": 5, "stat": "crit_chance", "value_per_level": 0.02},
-		{"id": "xp_boost", "name": "Memória Ancestral", "desc": "Experiência ganha +6% por nível. O passado fortalece o futuro.", "icon": "📚", "base_cost": 100, "max_level": 8, "stat": "xp_pct", "value_per_level": 0.06},
-		{"id": "attack_speed", "name": "Ritmo do Predador", "desc": "Velocidade de ataque +3% por nível. Mais golpes por segundo.", "icon": "⚡", "base_cost": 115, "max_level": 8, "stat": "attack_speed_pct", "value_per_level": 0.03},
+		{"id": "vitality", "name": "Sangue Antigo", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "❤️", "base_cost": 80, "max_level": 70, "stat": "max_health_pct", "value_per_level": 0.001},
+		{"id": "might", "name": "Aço Temperado", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚔️", "base_cost": 95, "max_level": 70, "stat": "damage_pct", "value_per_level": 0.001},
+		{"id": "fortune", "name": "Mão de Mercador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💰", "base_cost": 110, "max_level": 70, "stat": "fortune_pct", "value_per_level": 0.001},
+		{"id": "resilience", "name": "Pele de Pedra", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🛡️", "base_cost": 120, "max_level": 70, "stat": "defense_flat", "value_per_level": 0.001},
+		{"id": "swiftness", "name": "Passos do Vento", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💨", "base_cost": 90, "max_level": 70, "stat": "speed_pct", "value_per_level": 0.001},
+		{"id": "crit_mastery", "name": "Fio do Caos", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🎯", "base_cost": 130, "max_level": 70, "stat": "crit_chance", "value_per_level": 0.001},
+		{"id": "xp_boost", "name": "Memória Ancestral", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "📚", "base_cost": 100, "max_level": 70, "stat": "xp_pct", "value_per_level": 0.001},
+		{"id": "attack_speed", "name": "Ritmo do Predador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚡", "base_cost": 115, "max_level": 70, "stat": "attack_speed_pct", "value_per_level": 0.001},
 	]
 
 # ═══════════════════════════════════════════════════════════

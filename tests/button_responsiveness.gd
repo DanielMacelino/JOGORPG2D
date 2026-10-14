@@ -51,6 +51,10 @@ func run(tree: SceneTree) -> void:
 	assert(save.data.upgrades != ranks_before)
 	main._build_page("forge")
 	for frame in 10: await tree.process_frame
+	# Power sorting can put locked endgame recipes first; use the real availability filter.
+	var forge_panel: Node = main.page_root.find_child("ForgePanel", true, false)
+	forge_panel.possible.button_pressed = true
+	for frame in 10: await tree.process_frame
 	var forge: Button
 	for button in main.page_root.find_children("*", "Button", true, false):
 		if button.text == "Forjar" and not button.disabled:

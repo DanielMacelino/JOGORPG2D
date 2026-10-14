@@ -53,7 +53,7 @@ func _process(delta: float) -> void:
 			if wave == WAVES_BEFORE_BOSS + 1:
 				boss_spawned = true
 				boss_summoned.emit(map_data.boss_id if map_data != null else &"goblin_king")
-				var escort_count := 6
+				var escort_count := 10 if map_data != null and map_data.phase_number == 10 else 6
 				if NetworkSession.running and NetworkSession.hosting:
 					escort_count += 2 * (NetworkSession.players.size() - 1)
 				for member in escort_count:
@@ -63,11 +63,11 @@ func _process(delta: float) -> void:
 	var density := maxf(0.70, 1.0 - float(map_data.phase_number - 1) * 0.015 - float(map_data.difficulty_tier) * 0.025) if map_data != null else 1.0
 	interval *= density
 	if boss_spawned:
-		interval = 1.4 * density
+		interval = (1.1 if map_data != null and map_data.phase_number == 10 else 1.4) * density
 	spawn_clock -= delta
 	if spawn_clock <= 0.0:
 		spawn_clock = interval * rng.randf_range(0.82, 1.18)
-		var pack_size := 4 if boss_spawned else mini(8, 2 + wave)
+		var pack_size := (5 if map_data != null and map_data.phase_number == 10 else 4) if boss_spawned else mini(8, 2 + wave)
 		if NetworkSession.running and NetworkSession.hosting:
 			pack_size += NetworkSession.players.size() - 1
 		if not boss_spawned and map_data != null:

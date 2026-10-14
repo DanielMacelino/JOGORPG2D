@@ -18,7 +18,7 @@ func click(main: Node, text: String) -> void:
 
 func labels(main: Node) -> String:
 	var text := ""
-	for label in nodes(main.page_scroll, "Label"): text += label.text + "\n"
+	for label in nodes(main.page_root, "Label"): text += label.text + "\n"
 	return text
 
 func run(tree: SceneTree) -> void:
@@ -35,20 +35,22 @@ func run(tree: SceneTree) -> void:
 	main._build_page("prepare")
 	main._build_page("upgrades")
 	await settle(tree)
-	main.page_scroll.scroll_vertical = 180
-	var scroll_before: int = main.page_scroll.scroll_vertical
-	assert(scroll_before > 0)
+	assert(main.page_scroll == null, "Upgrades no longer need scrolling")
+	var upgrade_panel: Node = main.page_root.find_child("UpgradesPanel", true, false)
+	upgrade_panel.set_filter("strength")
+	var page_before: int = upgrade_panel.page_index
 	main._buy_upgrade("might", 100)
 	await settle(tree)
 	assert(save.upgrade_level("might") == 1)
-	assert(absi(main.page_scroll.scroll_vertical - scroll_before) <= 1, "Buying upgrades must preserve the scroll position")
-	for filter_name in ["Força", "Habilidades", "Movimento", "Outros", "Todos"]:
+	assert(upgrade_panel == main.page_root.find_child("UpgradesPanel", true, false))
+	assert(upgrade_panel.page_index == page_before and upgrade_panel.filter_id == "strength", "Buying upgrades must preserve navigation")
+	for filter_name in ["Força", "Habilidades", "Movimento", "Defesa", "Economia", "Todos"]:
 		click(main, filter_name)
 		await settle(tree)
-		assert(main.page_scroll.scroll_vertical == 0)
+		assert(main.page_scroll == null and upgrade_panel.page_index == 0)
 		var buy_count := 0
-		for button in nodes(main.page_scroll, "Button"):
-			if button.text.begins_with("APRIMORAR"): buy_count += 1
+		for button in nodes(main.page_root, "Button"):
+			if button.is_visible_in_tree() and button.text.begins_with("APRIMORAR"): buy_count += 1
 		assert(buy_count > 0 and (buy_count == 1 if filter_name == "Movimento" else true))
 	main._go_back()
 	assert(main.page_name == "prepare", "Back must return to the preceding page")

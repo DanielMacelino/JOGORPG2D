@@ -12,6 +12,6 @@ A musica fornecida musicaboss.mp3 foi movida para assets/audio/music. Comeca com
 
 A vitoria exibe equipamentos de todas as subidas de nivel e do chefe. Cada jogador online ve seus proprios itens ja creditados no save local. Repetidos convertidos em ouro sao identificados. Icones, raridade e origem aparecem em paginas de um ou dois cards, com descricao no tooltip e sem rolagem. O painel se ajusta ao tamanho da janela.
 
-O protocolo cooperativo agora e ashenwild-coop-6, pois foram adicionados campos de animacao, efeitos e musica. Os participantes precisam da mesma versao ao gerar o proximo executavel. Esta alteracao nao exporta um executavel.
+O protocolo cooperativo agora e ashenwild-coop-7, pois foram adicionados campos de animacao, efeitos e musica. Os participantes precisam da mesma versao ao gerar o proximo executavel. Esta alteracao nao exporta um executavel.
 
 Testes: animation_update.gd verifica poses, alternancia de adagas, ataques reais, efeitos replicaveis, escolta nas seis regioes, inicio/fim/idempotencia da musica, itens concedidos, paginacao e quatro resolucoes. online_integration.gd verifica esses estados e os itens pessoais com ENet real.

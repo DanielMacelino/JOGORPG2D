@@ -11,6 +11,8 @@ class_name AbilityData
 @export var stat: StringName = &""
 @export var stat_amount: float = 0.0
 @export var unlock_only: bool = false
+## A separate attack, aura, spell or summon; stat modifiers do not occupy a power slot.
+@export var active_power := false
 ## Empty class list means this ability is shared by every class.
 @export var class_ids: Array[StringName] = []
 @export var bonuses: Dictionary = {}

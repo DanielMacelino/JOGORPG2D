@@ -33,7 +33,13 @@ func _ready() -> void:
 	title = _label("A CENTELHA CRESCE", 36, ART.GOLD)
 	title.add_theme_font_override("font", ART.title_font())
 	header.add_child(title)
-	subtitle = _label("O grupo está em pausa. Escolha sua habilidade para continuar." if online else "Escolha uma melhoria para esta expedição.", 12, ART.MUTED)
+	var powers := 0
+	for id in ranks:
+		var ability: AbilityData = ContentCatalog.abilities.get(str(id))
+		if ability != null and ability.active_power and int(ranks[id]) > 0:
+			powers += 1
+	var hint := "Evolua seu trio ou escolha um passivo." if powers >= 3 else "Escolha até 3 poderes; passivos livres."
+	subtitle = _label("PODERES %d/3 · %s%s" % [powers, hint, " Grupo em pausa." if online else ""], 12, ART.MUTED)
 	header.add_child(subtitle)
 	header.add_child(ChoiceRule.new())
 	if not reward_text.is_empty():

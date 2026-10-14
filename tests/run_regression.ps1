@@ -24,7 +24,7 @@ foreach ($phase in $phases) {
     if ($phase -eq 'import') {
         $arguments += @('--editor', '--quit')
     } elseif ($phase -eq 'regression') {
-        $arguments += @('--script', 'res://tests/progression_regression.gd', '--quit-after', '5000')
+        $arguments += @('--script', 'res://tests/progression_regression.gd', '--quit-after', '15000')
     } else {
         $arguments += @('--script', 'res://tests/combat_balance.gd', '--fixed-fps', '60', '--quit-after', '350000')
         if ($CombatClasses) { $arguments += @('--', ('--classes=' + $CombatClasses)) }

@@ -3,13 +3,13 @@ signal changed
 signal launch_requested(config: Dictionary)
 signal session_closed(reason: String)
 signal lobby_requested
-const PROTOCOL := "ashenwild-coop-6"
+const PROTOCOL := "ashenwild-coop-7"
 const CODEC := preload("res://scripts/network/snapshot_codec.gd")
 const INPUT_STEP := 1.0 / 60.0
 const INPUT_REDUNDANCY := 8
 const PORT := 24567
 const MAX_PLAYERS := 4
-const PLAYER_STATS := ["max_health", "damage", "defense", "move_speed", "attack_cooldown", "attack_range", "projectile_speed", "crit_chance", "crit_multiplier", "bonus_gold_xp", "pickup_radius", "lifesteal", "regen", "cleave_targets", "projectile_pierce", "splash_bonus", "class_power", "power_damage", "thorns", "summon_duration", "summon_damage_pct", "projectile_bounces", "burn_on_hit", "chill_on_hit", "character_level"]
+const PLAYER_STATS := ["max_health", "damage", "defense", "move_speed", "attack_cooldown", "attack_range", "projectile_speed", "crit_chance", "crit_multiplier", "bonus_gold_xp", "bonus_xp_only", "permanent_damage_reduction", "pickup_radius", "lifesteal", "regen", "cleave_targets", "projectile_pierce", "splash_bonus", "class_power", "power_damage", "thorns", "summon_duration", "summon_damage_pct", "projectile_bounces", "burn_on_hit", "chill_on_hit", "character_level"]
 var active := false
 var hosting := false
 var running := false

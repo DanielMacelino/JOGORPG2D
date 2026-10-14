@@ -5,6 +5,8 @@ var actor: ChaserEnemy
 var clock := 4.0
 var attack_index := 0
 var second_phase := false
+var sovereign := false
+var final_phase := false
 
 func _process(delta: float) -> void:
 	if actor == null or actor.dead or not is_instance_valid(actor.player) or actor.player.is_dead:
@@ -13,10 +15,14 @@ func _process(delta: float) -> void:
 		second_phase = true
 		clock = minf(clock, 0.8)
 		enraged.emit()
+	if sovereign and not final_phase and actor.health <= actor.max_health * 0.25:
+		final_phase = true
+		clock = minf(clock, 1.0)
+		enraged.emit()
 	clock -= delta
 	if clock > 0.0:
 		return
-	clock = 3.6 if second_phase else 5.2
+	clock = (2.5 if final_phase else (3.2 if second_phase else 4.2)) if sovereign else (3.6 if second_phase else 5.2)
 	for spec in patterns():
 		attack_requested.emit(spec)
 	attack_index += 1
@@ -75,6 +81,51 @@ func patterns() -> Array[Dictionary]:
 					spores["lingering"] = true
 					spores["color"] = Color("#cbed91")
 					result.append(spores)
+	if sovereign:
+		result.append_array(_sovereign_patterns(origin, target, direction, amount))
+	return result
+
+func _sovereign_patterns(origin: Vector2, target: Vector2, direction: Vector2, amount: float) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var axis := direction.orthogonal()
+	match str(actor.kind):
+		"goblin_king":
+			# A pincer charge leaves the space between the two lines safe.
+			for side in [-1.0, 1.0]:
+				var line := _spec("line", target + axis * side * 95.0 - direction * 220.0, 24, amount)
+				line["end"] = target + axis * side * 95.0 + direction * 220.0
+				result.append(line)
+		"death_lord":
+			result.append(_ring(target, 235, 115, amount))
+			result.append(_fan(origin, direction.rotated(0.35 if attack_index % 2 == 0 else -0.35), 5, 0.7, amount, Color("#c4ffe9")))
+		"lava_lord":
+			for side in [-1.0, 1.0]:
+				var fissure := _spec("line", target + axis * side * 130.0 - direction * 180.0, 28, amount * 0.75)
+				fissure.merge({"end": target + axis * side * 130.0 + direction * 180.0, "lingering": true, "color": Color("#ff9c59")})
+				result.append(fissure)
+		"vampire_king":
+			for angle in [-0.65, 0.65]:
+				var diagonal := direction.rotated(angle)
+				var cut := _spec("line", target - diagonal * 240.0, 23, amount)
+				cut.merge({"end": target + diagonal * 240.0, "color": Color("#ff7f9c")})
+				result.append(cut)
+		"frost_guardian":
+			result.append(_ring(origin, 310, 210, amount))
+			for side in [-1.0, 1.0]:
+				var ice := _spec("circle", target + axis * side * 130.0, 55, amount)
+				ice["color"] = Color("#9cecff")
+				result.append(ice)
+		"mire_queen":
+			for index in 4:
+				var angle := float(index) * TAU / 4.0 + float(attack_index) * 0.35
+				var spore := _spec("circle", target + Vector2.from_angle(angle) * 175.0, 52, amount * 0.7)
+				spore.merge({"lingering": true, "color": Color("#d0ed85")})
+				result.append(spore)
+	if final_phase:
+		result.append(_fan(origin, direction, 5, 1.5, amount * 0.85, Color("#ffdf92")))
+	for spec in result:
+		# Every additional attack is announced; rage never removes the dodge window.
+		spec["duration"] = 1.35 if final_phase else 1.6
 	return result
 
 func _spec(shape: String, position: Vector2, radius: float, amount: float) -> Dictionary:

@@ -392,7 +392,7 @@ func _refresh_skill_list() -> void:
 		var data: AbilityData = ContentCatalog.abilities.get(str(id))
 		if data != null:
 			parts.append("%s %d" % [data.display_name, abilities.level_of(id)])
-	skill_label.text = "✦  %s  ·  %d HABILIDADES" % [_class_ability_name(), parts.size()]
+	skill_label.text = "✦  %s  ·  %d/3 PODERES  ·  %d MELHORIAS" % [_class_ability_name(), abilities.active_power_count(), parts.size()]
 	skill_label.max_lines_visible = 2
 	skill_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	skill_label.tooltip_text = "\n".join(parts)
@@ -460,7 +460,7 @@ func _on_enemy_died(enemy: ChaserEnemy) -> void:
 	else:
 		_spawn_gold_drop(enemy, earned_gold)
 	if get_tree().get_nodes_in_group("xp_drop").size() >= 150:
-		_on_orb_collected(roundi(enemy.xp_reward * (1.0 + player.bonus_gold_xp) * CampaignRules.reward_multiplier(difficulty_tier, phase_number)))
+		_on_orb_collected(roundi(enemy.xp_reward * (1.0 + player.bonus_gold_xp + player.bonus_xp_only) * CampaignRules.reward_multiplier(difficulty_tier, phase_number)))
 	else:
 		_spawn_xp_drop(enemy)
 	if randf() < 0.025:
@@ -476,8 +476,9 @@ func _on_objective_complete() -> void:
 
 func _on_boss_enraged() -> void:
 	if is_instance_valid(boss):
-		boss_name_label.text = boss.data.display_name.to_upper() + " · FÚRIA"
-		_show_notice("SEGUNDA ETAPA · O GUARDIÃO DESPERTA SUA FÚRIA")
+		var brain := boss.get_node("BossBrain")
+		boss_name_label.text = boss.data.display_name.to_upper() + (" · FÚRIA FINAL" if brain.final_phase else " · FÚRIA")
+		_show_notice("FÚRIA FINAL · A SOBREVIVÊNCIA SERÁ POSTA À PROVA" if brain.final_phase else "SEGUNDA ETAPA · O GUARDIÃO DESPERTA SUA FÚRIA")
 
 func _on_boss_pattern(spec: Dictionary) -> void:
 	if get_tree().get_nodes_in_group("danger_area").size() >= 36:
@@ -500,7 +501,7 @@ func _spawn_xp_drop(enemy: ChaserEnemy) -> void:
 	var orb := ORB_SCRIPT.new()
 	orb.player = player
 	orb.value = enemy.xp_reward
-	orb.bonus = (1.0 + player.bonus_gold_xp) * CampaignRules.reward_multiplier(difficulty_tier, phase_number) - 1.0
+	orb.bonus = (1.0 + player.bonus_gold_xp + player.bonus_xp_only) * CampaignRules.reward_multiplier(difficulty_tier, phase_number) - 1.0
 	orb.global_position = enemy.global_position
 	orb.collected.connect(_on_orb_collected)
 	add_child(orb)
@@ -1088,7 +1089,7 @@ func _finish_run(victory: bool) -> void:
 	wave_director.stop()
 	var playtime_val := wave_director.match_time if wave_director != null else 0.0
 	var damage_dealt := float(player.get("total_damage_dealt") if player != null and player.get("total_damage_dealt") != null else 0.0)
-	SaveManager.record_run(wave_director.wave, run_gold, playtime_val, enemies_defeated, player_class, bosses_defeated, elites_defeated, damage_dealt, victory, CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1.0 + player.bonus_gold_xp))
+	SaveManager.record_run(wave_director.wave, run_gold, playtime_val, enemies_defeated, player_class, bosses_defeated, elites_defeated, damage_dealt, victory, CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1.0 + player.bonus_gold_xp + player.bonus_xp_only))
 	if victory:
 		SaveManager.complete_phase(map_id, phase_number, difficulty_tier)
 	GameManager.finish_run()

@@ -31,6 +31,12 @@ func _run() -> void:
 	await _test_class_abilities()
 	await _test_summons_and_threat()
 	await _test_expeditions()
+	await load("res://tests/transmutation.gd").new().run(self)
+	await load("res://tests/relics_screen.gd").new().run(self)
+	await load("res://tests/upgrades_screen.gd").new().run(self)
+	await load("res://tests/characters_screen.gd").new().run(self)
+	await load("res://tests/forge_workbench.gd").new().run(self)
+	await load("res://tests/inventory_mastery_powers.gd").new().run(self)
 	await _test_inventory()
 	await _test_ability_labels()
 	await _test_menus()
@@ -229,7 +235,7 @@ func _test_class_abilities() -> void:
 		var exclusive := 0
 		for id in pool:
 			var ability: AbilityData = catalog.abilities[str(id)]
-			assert(ability.available_to(str(class_id)) and not ability.unlock_only)
+			assert(ability.available_to(str(class_id)) and (not ability.unlock_only or ability.id == game.player.class_data.starting_ability))
 			exclusive += int(ability.class_ids.size() == 1)
 			game.abilities.reset(game.player.class_data.starting_ability, str(class_id))
 			game.player.rebuild_run_stats(game.abilities.accumulated_bonuses())
@@ -248,7 +254,8 @@ func _test_class_abilities() -> void:
 			var cooldown: float = game.player.attack_cooldown
 			game.player.rebuild_run_stats(totals)
 			assert(is_equal_approx(cooldown, game.player.attack_cooldown), "Rebuilding does not apply bonuses twice")
-			assert(game.abilities.grant(id) and game.abilities.grant(id))
+			while game.abilities.level_of(id) < 5:
+				assert(game.abilities.grant(id))
 			assert(not game.abilities.grant(id), "Rank five is the limit")
 		assert(exclusive >= 4)
 		assert(not game.abilities.grant(&"missing"))
@@ -285,10 +292,11 @@ func _test_summons_and_threat() -> void:
 		companion._physics_process(0.8)
 		companion._physics_process(0.8)
 	assert(enemy.health < before and game.player.total_damage_dealt > 0.0, "Summons deal actual damage")
+	var initial_summon_bonus: float = game.player.summon_damage_pct
 	for rank in 3:
 		game._choose_ability(&"wolf_pack")
 		game._choose_ability(&"living_bark")
-	assert(game.player.summon_count == 3 and is_equal_approx(game.player.summon_damage_pct, 0.54))
+	assert(game.player.summon_count == 3 and is_equal_approx(game.player.summon_damage_pct, initial_summon_bonus + 0.54))
 	game._summon_companions("wolf", 2 + game.player.summon_count, 14 + game.player.summon_duration)
 	assert(get_nodes_in_group("forest_companion").size() == 5, "Recasting replaces the previous pack")
 	game._cast_special("ancient_guardian", 3)
@@ -479,6 +487,14 @@ func _test_inventory() -> void:
 		for card in panel.item_list.get_children():
 			assert(card.size.x <= panel.item_scroll.size.x + 1.0, "Owned items cannot overflow horizontally")
 	panel.select_filter("")
+	# Populate more than one icon page to verify pagination of a real collection.
+	for id in catalog.equipment:
+		var gear: EquipmentData = catalog.equipment[id]
+		if str(gear.class_id) == "paladin":
+			save.unlock_equipment(str(id))
+			if panel.owned_items().size() > panel.page_size:
+				break
+	panel._refresh_items()
 	var displayed: Array[String] = []
 	var first_page: Array[String] = []
 	for card in panel.item_list.get_children():

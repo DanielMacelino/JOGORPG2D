@@ -32,11 +32,20 @@ func spawn(kind: StringName, wave: int, forced_position := Vector2.INF) -> Chase
 	var enemy_data: EnemyData = ContentCatalog.enemies.get(str(kind), ContentCatalog.enemies.get("slime"))
 	if enemies.size() >= MAX_ENEMIES and not enemy_data.boss:
 		return null
+	var sovereign := enemy_data.boss and map_data != null and map_data.phase_number == 10
+	if sovereign:
+		enemy_data = enemy_data.duplicate() as EnemyData
+		enemy_data.display_name += " · Soberano"
 	var enemy := preload("res://scripts/world/enemy.gd").new() as ChaserEnemy
 	enemy.configure(enemy_data, player, wave, map_data.difficulty if map_data != null else 1.0)
 	if enemy_data.boss and map_data != null and map_data.phase_number == 5:
 		enemy.max_health *= 1.6
 		enemy.health = enemy.max_health
+	if sovereign:
+		enemy.max_health *= 2.8
+		enemy.health = enemy.max_health
+		enemy.damage *= 1.30
+		enemy.speed *= 1.08
 	if NetworkSession.running and NetworkSession.hosting:
 		enemy.max_health *= 1.0 + 0.70 * (NetworkSession.players.size() - 1)
 		enemy.health = enemy.max_health
@@ -67,6 +76,7 @@ func spawn(kind: StringName, wave: int, forced_position := Vector2.INF) -> Chase
 		var brain := preload("res://scripts/systems/boss_brain.gd").new()
 		brain.name = "BossBrain"
 		brain.actor = enemy
+		brain.sovereign = sovereign
 		brain.attack_requested.connect(func(spec: Dictionary) -> void: boss_pattern.emit(spec))
 		brain.enraged.connect(func() -> void: boss_enraged.emit())
 		enemy.add_child(brain)

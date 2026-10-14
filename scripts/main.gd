@@ -34,6 +34,10 @@ var forge_draft: Dictionary = {}
 
 var relayout_queued := false
 var inventory_selected_slot := ""
+var transmutation_draft: Dictionary = {}
+var relics_draft: Dictionary = {}
+var upgrades_draft: Dictionary = {}
+var characters_draft: Dictionary = {}
 var forge_selected_recipe := ""
 var achievement_filter := "all"
 var bestiary_region := "all"
@@ -133,7 +137,8 @@ func _build_page(page: String) -> void:
 	page_name = page
 	if backdrop_layer != null and backdrop_layer.get_child_count() > 0:
 		backdrop_layer.get_child(0).home = page in ["home", "prepare"]
-		backdrop_layer.get_child(0).records = page in ["records", "online", "inventory", "equipment", "talents"]
+		backdrop_layer.get_child(0).forge = page == "forge"
+		backdrop_layer.get_child(0).records = page in ["records", "online", "inventory", "equipment", "talents", "relics", "upgrades", "characters"]
 		backdrop_layer.get_child(0).queue_redraw()
 	if page_root != null and is_instance_valid(page_root):
 		page_root.queue_free()
@@ -156,7 +161,7 @@ func _build_page(page: String) -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 10)
 	var scroll: ScrollContainer = null
-	if page in ["online", "inventory", "equipment", "talents", "forge"]:
+	if page in ["online", "inventory", "equipment", "talents", "forge", "transmutation", "relics", "upgrades", "characters"]:
 		page_scroll = null
 		var viewport := preload("res://scripts/ui/menu/online_viewport.gd").new()
 		viewport.content = content
@@ -184,6 +189,7 @@ func _build_page(page: String) -> void:
 		"bestiary": _build_bestiary(content)
 		"achievements": _build_achievements(content)
 		"forge": _build_forge(content)
+		"transmutation": _build_transmutation(content)
 		"relics": _build_relics(content)
 		"statistics": _build_statistics(content)
 		"bounties": _build_bounties(content)
@@ -322,76 +328,21 @@ func _build_page_heading(parent: VBoxContainer, title: String, summary: String) 
 # PERSONAGENS
 # ═══════════════════════════════════════════════════════════
 func _build_characters(parent: VBoxContainer) -> void:
-	_build_page_heading(parent, "PERSONAGENS", "Seis estilos de combate. Recrute novos viajantes com ouro ou cristais.")
-	var grid := GridContainer.new()
-	grid.columns = 3 if get_viewport_rect().size.x >= 960 else 1
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
-	parent.add_child(grid)
-	for id in ContentCatalog.CLASS_ORDER:
-		var data: ClassData = ContentCatalog.classes[id]
-		var unlocked := SaveManager.is_class_unlocked(id)
-		var card := _panel(grid, PANEL, Vector2.ZERO)
-		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 10)
-		card.add_child(_pad(content, 8, 4, 8, 8))
-		var portrait := preload("res://scripts/ui/menu_portrait.gd").new()
-		portrait.class_id = id
-		portrait.custom_minimum_size = Vector2(100, 186)
-		if not unlocked:
-			portrait.modulate = Color(0.65, 0.65, 0.65)
-		content.add_child(portrait)
-		_label(content, "RECRUTÁVEL" if not unlocked else ("EM VIAGEM" if selected_class == id else "NO ACAMPAMENTO"), 9, GOLD if not unlocked else STYLE.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		var title := _label(content, data.display_name, 25, data.accent, HORIZONTAL_ALIGNMENT_CENTER)
-		title.add_theme_font_override("font", STYLE.title_font())
-		var description := _label(content, data.description, 13, STYLE.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		description.custom_minimum_size.y = 54
-		var stats := HBoxContainer.new()
-		stats.add_theme_constant_override("separation", 10)
-		content.add_child(stats)
-		_stat_bar(stats, "VIDA", data.max_health, 220, Color("#c98972"))
-		_stat_bar(stats, "DANO", data.damage, 40, GOLD)
-		_stat_bar(stats, "PASSO", data.speed, 320, Color("#93b09a"))
-		var starting: AbilityData = ContentCatalog.abilities.get(str(data.starting_ability))
-		if starting != null:
-			_label(content, starting.display_name + "  ·  " + starting.description, 11, data.accent, HORIZONTAL_ALIGNMENT_CENTER).custom_minimum_size.y = 40
-		var runs := int(SaveManager.data.get("statistics", {}).get("class_runs", {}).get(id, 0))
-		_label(content, "%d expedições com esta classe" % runs, 11, STYLE.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		_label(content, "NÍVEL %d · %d / %d XP" % [TalentManager.character_level(id), TalentManager.xp_into_level(id), TalentManager.level_cost(TalentManager.character_level(id))], 12, data.accent, HORIZONTAL_ALIGNMENT_CENTER)
-		var character_xp := ProgressBar.new()
-		character_xp.custom_minimum_size.y = 5
-		character_xp.show_percentage = false
-		character_xp.max_value = TalentManager.level_cost(TalentManager.character_level(id))
-		character_xp.value = character_xp.max_value if TalentManager.character_level(id) == TalentManager.MAX_LEVEL else TalentManager.xp_into_level(id)
-		character_xp.add_theme_stylebox_override("background", STYLE.panel(STYLE.LINE, 0))
-		character_xp.add_theme_stylebox_override("fill", STYLE.panel(data.accent, 0))
-		content.add_child(character_xp)
-		if unlocked:
-			_button(content, "Selecionado ✓" if selected_class == id else "Escolher classe", _select_class.bind(id), selected_class != id, 42)
-		else:
-			var gold_buy := _button(content, "Recrutar  ·  %d ouro" % data.cost_gold, _unlock_class.bind(id, "gold"), true, 42)
-			gold_buy.disabled = int(SaveManager.data.gold) < data.cost_gold
-			var crystal_buy := _button(content, "ou %d cristais" % data.cost_crystals, _unlock_class.bind(id, "crystals"), false, 38)
-			crystal_buy.disabled = int(SaveManager.data.crystals) < data.cost_crystals
+	var panel := preload("res://scripts/ui/characters_panel.gd").new()
+	panel.draft = characters_draft
+	panel.selected_class = selected_class
+	panel.back_requested.connect(_go_back)
+	panel.class_selected.connect(_select_class)
+	panel.recruit_requested.connect(_unlock_class)
+	parent.add_child(panel)
 
-
-func _stat_bar(parent: Node, label: String, value: float, max_value: float, color: Color) -> void:
-	var box := VBoxContainer.new()
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_theme_constant_override("separation", 2)
-	parent.add_child(box)
-	_label(box, label, 9, Color("#888"))
-	var pb := ProgressBar.new()
-	pb.show_percentage = false
-	pb.min_value = 0
-	pb.max_value = max_value
-	pb.value = value
-	pb.custom_minimum_size.y = 6
-	_label(box, str(int(value)), 13, color)
-	pb.add_theme_stylebox_override("fill", _progress_fill(color))
-	pb.add_theme_stylebox_override("background", _progress_bg())
-	box.add_child(pb)
+func _refresh_character_selection() -> void:
+	var panel := page_root.find_child("CharactersPanel", true, false)
+	if panel != null:
+		panel.selected_class = selected_class
+		panel.refresh()
+	else:
+		_build_page("characters")
 
 func _select_class(id: String) -> void:
 	if not SaveManager.is_class_unlocked(id):
@@ -399,7 +350,7 @@ func _select_class(id: String) -> void:
 	selected_class = id
 	SaveManager.set_selected_class(id)
 	TalentManager.set_class(id)
-	_build_page("characters")
+	_refresh_character_selection()
 
 func _unlock_class(id: String, currency: String) -> void:
 	if SaveManager.unlock_class(id, currency):
@@ -407,8 +358,10 @@ func _unlock_class(id: String, currency: String) -> void:
 		selected_class = id
 		SaveManager.set_selected_class(id)
 		TalentManager.set_class(id)
-		_build_page("characters")
-		_page_notice(_class_name(id) + " se juntou ao acampamento. A arma inicial já está equipada.")
+		_refresh_character_selection()
+		var panel := page_root.find_child("CharactersPanel", true, false)
+		if panel != null:
+			panel.notice.text = _class_name(id) + " se juntou ao acampamento. Arma inicial equipada."
 
 # ═══════════════════════════════════════════════════════════
 # INVENTÁRIO
@@ -420,7 +373,15 @@ func _build_inventory(parent: VBoxContainer) -> void:
 	inventory.selected_slot = inventory_selected_slot
 	inventory.filter_changed.connect(_remember_inventory_filter)
 	inventory.forge_requested.connect(_build_page.bind("forge"))
+	inventory.transmutation_requested.connect(_build_page.bind("transmutation"))
 	parent.add_child(inventory)
+
+func _build_transmutation(parent: VBoxContainer) -> void:
+	var panel := preload("res://scripts/ui/transmutation_panel.gd").new()
+	panel.class_id = selected_class
+	panel.draft = transmutation_draft
+	panel.back_requested.connect(_go_back)
+	parent.add_child(panel)
 
 func _remember_inventory_filter(slot: String) -> void:
 	inventory_selected_slot = slot
@@ -640,79 +601,16 @@ func _select_talent_class(index: int) -> void:
 # MELHORIAS PERMANENTES
 # ═══════════════════════════════════════════════════════════
 func _build_upgrades(parent: VBoxContainer) -> void:
-	_build_page_heading(parent, "MELHORIAS", "Invista o ouro das expedições em poder permanente.")
-	_add_filters(parent, [["Todos", "all"], ["Força", "strength"], ["Habilidades", "skills"], ["Movimento", "movement"], ["Outros", "other"]], upgrade_filter, func(value: String) -> void:
-		upgrade_filter = value
-		_build_page("upgrades")
-		scroll_positions["upgrades"] = 0
-		page_scroll.scroll_vertical = 0)
-	var compact := get_viewport_rect().size.x < 620.0
-	var total_spent := 0
-	for u in ContentCatalog.upgrades:
-		total_spent += int(SaveManager.upgrade_level(u.id))
-	_label(parent, "MELHORIAS ADQUIRIDAS: %d  ·  PODER TOTAL ACUMULADO" % total_spent, 12, GOLD)
-	# Barra de poder total
-	var power_bar := ProgressBar.new()
-	power_bar.show_percentage = false
-	power_bar.min_value = 0
-	power_bar.max_value = ContentCatalog.upgrades.size() * 10
-	power_bar.value = total_spent
-	power_bar.custom_minimum_size.y = 10
-	power_bar.add_theme_stylebox_override("fill", _progress_fill(GOLD))
-	power_bar.add_theme_stylebox_override("background", _progress_bg())
-	parent.add_child(power_bar)
-	_divider(parent)
-	for item in ContentCatalog.upgrades:
-		var category: String = {"might": "strength", "crit_mastery": "strength", "attack_speed": "skills", "xp_boost": "skills", "swiftness": "movement"}.get(str(item.id), "other")
-		if upgrade_filter != "all" and upgrade_filter != category: continue
-		var rank := int(SaveManager.upgrade_level(item.id))
-		var max_level := int(item.get("max_level", 10))
-		var base_cost := int(item.get("base_cost", 100))
-		var cost: int = int(base_cost + rank * base_cost / 2)
-		var maxed := rank >= max_level
-		var upgrade_color := GOLD if not maxed else MINT
-		var card := _panel(parent, PANEL, Vector2.ZERO)
-		var layout: Control = VBoxContainer.new() if compact else HBoxContainer.new()
-		layout.add_theme_constant_override("separation", 10)
-		card.add_child(_pad(layout, 13, 9, 13, 9))
-		var info := VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.alignment = BoxContainer.ALIGNMENT_CENTER
-		layout.add_child(info)
-		var title_row := HBoxContainer.new()
-		title_row.add_theme_constant_override("separation", 8)
-		info.add_child(title_row)
-		_label(title_row, str(item.get("icon", "⚡")), 18, upgrade_color, HORIZONTAL_ALIGNMENT_CENTER).custom_minimum_size.x = 28
-		_label(title_row, item.name + "   ·   NÍV. %d/%d" % [rank, max_level], 17, upgrade_color).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_label(info, item.desc, 12, Color("#a8b9b4"))
-		# Barra de progresso do upgrade
-		var prog_bar := ProgressBar.new()
-		prog_bar.show_percentage = false
-		prog_bar.min_value = 0
-		prog_bar.max_value = max_level
-		prog_bar.value = rank
-		prog_bar.custom_minimum_size.y = 8
-		prog_bar.add_theme_stylebox_override("fill", _progress_fill(upgrade_color if not maxed else MINT))
-		prog_bar.add_theme_stylebox_override("background", _progress_bg())
-		info.add_child(prog_bar)
-		if maxed:
-			var done_btn := _button(layout, "MÁXIMO ✓", func(): pass, false, 40)
-			done_btn.disabled = true
-			done_btn.custom_minimum_size.x = 0 if compact else 180
-		else:
-			var action := _button(layout, "APRIMORAR  ·  %d OURO" % cost, _buy_upgrade.bind(item.id, cost), true, 42)
-			action.custom_minimum_size.x = 0 if compact else 180
-	_label(parent, "As melhorias aparecem em toda nova partida. O ouro da expedição é contabilizado ao retornar ao menu.", 12, Color("#94aaa4"))
+	var panel := preload("res://scripts/ui/upgrades_panel.gd").new()
+	panel.draft = upgrades_draft
+	panel.back_requested.connect(_go_back)
+	parent.add_child(panel)
 
-func _buy_upgrade(id: String, cost: int) -> void:
-	if not SaveManager.buy_upgrade(id, cost):
-		_page_notice("Ainda faltam %d de ouro para esta melhoria." % maxi(0, cost - int(SaveManager.data.gold)))
-	else:
-		_build_page("upgrades")
+func _buy_upgrade(id: String, _cost: int) -> void:
+	var panel := page_root.find_child("UpgradesPanel", true, false)
+	if panel != null:
+		panel.purchase(id)
 
-# ═══════════════════════════════════════════════════════════
-# FORJA — SISTEMA COMPLETO
-# ═══════════════════════════════════════════════════════════
 func _build_forge(parent: VBoxContainer) -> void:
 	var panel := preload("res://scripts/ui/forge_panel.gd").new()
 	panel.draft = forge_draft
@@ -740,113 +638,11 @@ func _do_forge(recipe_id: String) -> void:
 # RELÍQUIAS — SISTEMA COMPLETO
 # ═══════════════════════════════════════════════════════════
 func _build_relics(parent: VBoxContainer) -> void:
-	_build_page_heading(parent, "RELÍQUIAS", "Modificadores poderosos que alteram as regras de cada expedição.")
-	var compact := get_viewport_rect().size.x < 680.0
-	var equipped_relics: Array = SaveManager.get_equipped_relics()
-	var owned_relics: Array = SaveManager.data.get("relics", [])
+	var panel := preload("res://scripts/ui/relics_panel.gd").new()
+	panel.draft = relics_draft
+	panel.back_requested.connect(_go_back)
+	parent.add_child(panel)
 
-	# Status de slots
-	var slot_row := HBoxContainer.new()
-	slot_row.add_theme_constant_override("separation", 8)
-	parent.add_child(slot_row)
-	_label(slot_row, "SLOTS ATIVOS:", 13, Color("#888"))
-	for i in 3:
-		var slot_card := _panel(slot_row, Color("#1a1510"), Vector2(80, 36))
-		if i < equipped_relics.size():
-			var relic_data := ContentCatalog.get_relic(equipped_relics[i])
-			if not relic_data.is_empty():
-				_label(slot_card, str(relic_data.get("icon", "⚱")) + " " + str(relic_data.get("name", "")).left(10), 10, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		else:
-			_label(slot_card, "VAZIO", 10, Color("#444"), HORIZONTAL_ALIGNMENT_CENTER)
-	_label(slot_row, "(máx. 3 relíquias equipadas)", 10, Color("#666"))
-
-	_divider(parent)
-	_label(parent, "RELÍQUIAS DESBLOQUEADAS  ·  %d/%d" % [owned_relics.size(), ContentCatalog.relics.size()], 14, GOLD)
-
-	for relic_data in ContentCatalog.relics:
-		var relic_id: String = relic_data.id
-		var owned := owned_relics.has(relic_id)
-		var is_equipped := equipped_relics.has(relic_id)
-		var rarity := str(relic_data.get("rarity", "common"))
-		var card_bg: Color = RARITY_BG.get(rarity, PANEL) if owned else Color("#0e0c0a")
-		var card := _panel(parent, card_bg, Vector2.ZERO)
-
-		if owned:
-			var card_style := StyleBoxFlat.new()
-			card_style.bg_color = card_bg
-			card_style.border_color = _rarity_color(rarity).darkened(0.4) if not is_equipped else _rarity_color(rarity)
-			card_style.border_width_left = 4
-			card_style.border_width_right = 0
-			card_style.border_width_top = 0
-			card_style.border_width_bottom = 0
-			card_style.set_corner_radius_all(3)
-			card_style.content_margin_left = 14
-			card_style.content_margin_right = 14
-			card_style.content_margin_top = 10
-			card_style.content_margin_bottom = 10
-			card.add_theme_stylebox_override("panel", card_style)
-
-		var layout: Control = VBoxContainer.new() if compact else HBoxContainer.new()
-		layout.add_theme_constant_override("separation", 12)
-		card.add_child(layout)
-
-		# Ícone
-		var icon_lbl := _label(layout, str(relic_data.get("icon", "⚱")) if owned else "🔒", 28, _rarity_color(rarity) if owned else Color("#3a3330"), HORIZONTAL_ALIGNMENT_CENTER)
-		icon_lbl.custom_minimum_size.x = 48
-		icon_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-
-		# Info
-		var info := VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_theme_constant_override("separation", 4)
-		layout.add_child(info)
-
-		var title_row := HBoxContainer.new()
-		info.add_child(title_row)
-		var name_color := _rarity_color(rarity) if owned else Color("#3a3330")
-		_label(title_row, str(relic_data.get("name", relic_id)) if owned else "???", 15, name_color).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if owned:
-			_rarity_badge(title_row, rarity)
-		if is_equipped:
-			_label(title_row, "  ATIVA ✓", 11, MINT)
-
-		if owned:
-			_label(info, str(relic_data.get("desc", "")), 12, Color("#b0a898"))
-			var unlock_cond := str(relic_data.get("unlock", ""))
-			if not unlock_cond.is_empty():
-				var achievement := ContentCatalog.get_achievement(unlock_cond)
-				_label(info, "Conquista: " + str(achievement.get("title", "Exploração")).capitalize(), 10, STYLE.MUTED)
-		else:
-			_label(info, "Desbloqueie completando conquistas e derrotando chefes.", 12, Color("#3a3330"))
-
-		# Botões
-		if owned:
-			if is_equipped:
-				var un_btn := _button(layout, "REMOVER", _unequip_relic.bind(relic_id), false, 40)
-				un_btn.custom_minimum_size.x = 96 if not compact else 0
-			else:
-				var eq_btn := _button(layout, "EQUIPAR", _equip_relic.bind(relic_id), true, 40)
-				eq_btn.custom_minimum_size.x = 96 if not compact else 0
-				eq_btn.disabled = equipped_relics.size() >= 3
-
-	if owned_relics.is_empty():
-		var hint_card := _panel(parent, Color("#0f1310"), Vector2.ZERO)
-		_label(hint_card, "Complete conquistas para desbloquear relíquias.\nDerrote chefes de região para encontrar relíquias raras.", 13, Color("#6a8070"), HORIZONTAL_ALIGNMENT_CENTER)
-
-	_label(parent, "⚱ Relíquias equipadas entram em vigor na próxima expedição. Máximo de 3 relíquias simultâneas.", 12, Color("#7a9490"))
-
-func _equip_relic(relic_id: String) -> void:
-	if not SaveManager.equip_relic(relic_id):
-		_page_notice("Não é possível equipar esta relíquia. Verifique os slots disponíveis.")
-	_build_page("relics")
-
-func _unequip_relic(relic_id: String) -> void:
-	SaveManager.unequip_relic(relic_id)
-	_build_page("relics")
-
-# ═══════════════════════════════════════════════════════════
-# BESTIÁRIO — RICO
-# ═══════════════════════════════════════════════════════════
 func _build_bestiary(parent: VBoxContainer) -> void:
 	_build_page_heading(parent, "BESTIÁRIO", "Conheça seus inimigos. Todo conhecimento é uma vantagem.")
 	var kills: Dictionary = SaveManager.data.get("bestiary_kills", {})
@@ -1477,6 +1273,10 @@ func _reset_player_progress() -> void:
 	TalentManager.set_class(selected_class)
 	online_draft.clear()
 	forge_draft.clear()
+	transmutation_draft.clear()
+	relics_draft.clear()
+	upgrades_draft.clear()
+	characters_draft.clear()
 	page_history.clear()
 	scroll_positions.clear()
 	inventory_selected_slot = ""

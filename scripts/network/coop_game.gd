@@ -331,7 +331,7 @@ func _finish_run(victory: bool, party_defeated: bool = false) -> void:
 		var drop := loot.roll_boss_reward(map_id, actor.player_class, phase_number, NetworkSession.players[id].owned, difficulty_tier) if victory else {}
 		if victory:
 			drop.gold = roundi(int(drop.gold) * CampaignRules.reward_multiplier(difficulty_tier, phase_number))
-		results[id] = {"class": actor.player_class, "victory": victory, "reward": drop, "gold": actor.run_gold, "wave": wave_director.wave, "time": wave_director.match_time, "kills": enemies_defeated, "bosses": bosses_defeated, "elites": elites_defeated, "damage": actor.player.total_damage_dealt, "level_rewards": actor.level_rewards, "multiplier": CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1 + actor.player.bonus_gold_xp), "kinds": kill_kinds, "uses": actor.ability_uses}
+		results[id] = {"class": actor.player_class, "victory": victory, "reward": drop, "gold": actor.run_gold, "wave": wave_director.wave, "time": wave_director.match_time, "kills": enemies_defeated, "bosses": bosses_defeated, "elites": elites_defeated, "damage": actor.player.total_damage_dealt, "level_rewards": actor.level_rewards, "multiplier": CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1 + actor.player.bonus_gold_xp + actor.player.bonus_xp_only), "kinds": kill_kinds, "uses": actor.ability_uses}
 	NetworkSession.finish(results)
 
 func show_coop_result(result: Dictionary, banked_gold: int) -> void:

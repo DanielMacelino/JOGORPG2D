@@ -28,6 +28,8 @@ var projectile_speed := 450.0
 var crit_chance := 0.05
 var crit_multiplier := 1.7
 var bonus_gold_xp := 0.0
+var bonus_xp_only := 0.0
+var permanent_damage_reduction := 0.0
 var pickup_radius := 160.0
 var lifesteal := 0.0
 var regen := 0.0
@@ -85,25 +87,27 @@ func configure(class_id: String, permanent_equipment: Dictionary) -> void:
 	var save: Dictionary = SaveManager.data
 	var upgrades: Dictionary = save.get("upgrades", {})
 	var equipment_bonuses: Dictionary = EquipmentManager.equipped_bonuses(class_id)
-	max_health = class_data.max_health * (1.0 + int(upgrades.get("vitality", 0)) * 0.05)
-	damage = class_data.damage * (1.0 + int(upgrades.get("might", 0)) * 0.04)
+	max_health = class_data.max_health
+	damage = class_data.damage
 	defense = class_data.defense
 	defense += float(equipment_bonuses.get("defense", 0.0))
 	move_speed = class_data.speed
 	attack_cooldown = class_data.attack_cooldown
 	attack_range = class_data.attack_range
 	projectile_speed = class_data.projectile_speed
-	bonus_gold_xp = int(upgrades.get("fortune", 0)) * 0.05
-	bonus_gold_xp += int(upgrades.get("xp_boost", 0)) * 0.025
-	defense += int(upgrades.get("resilience", 0)) * 0.6
-	move_speed *= 1.0 + int(upgrades.get("swiftness", 0)) * 0.03
-	crit_chance += minf(0.2, int(upgrades.get("crit_mastery", 0)) * 0.015)
-	attack_cooldown /= 1.0 + int(upgrades.get("attack_speed", 0)) * 0.03
+	bonus_gold_xp = PermanentUpgrades.bonus(int(upgrades.get("fortune", 0)))
+	bonus_xp_only = PermanentUpgrades.bonus(int(upgrades.get("xp_boost", 0)))
+	permanent_damage_reduction = PermanentUpgrades.effective_bonus("resilience", int(upgrades.get("resilience", 0)))
+	move_speed *= 1.0 + PermanentUpgrades.bonus(int(upgrades.get("swiftness", 0)))
+	crit_chance += PermanentUpgrades.effective_bonus("crit_mastery", int(upgrades.get("crit_mastery", 0)))
+	attack_cooldown /= 1.0 + PermanentUpgrades.bonus(int(upgrades.get("attack_speed", 0)))
 	attack_cooldown /= 1.0 + float(equipment_bonuses.get("attack_speed_pct", 0.0))
 	damage += float(equipment_bonuses.get("damage", 0.0))
 	damage *= 1.0 + float(equipment_bonuses.get("damage_pct", 0.0))
+	damage *= 1.0 + PermanentUpgrades.bonus(int(upgrades.get("might", 0)))
 	move_speed *= 1.0 + float(equipment_bonuses.get("speed_pct", 0.0))
 	max_health += float(equipment_bonuses.get("health", 0.0)) + float(permanent_equipment.get("health", 0.0))
+	max_health *= 1.0 + PermanentUpgrades.bonus(int(upgrades.get("vitality", 0)))
 	var talents: Dictionary = TalentManager.bonuses(class_id)
 	character_level = TalentManager.character_level(class_id)
 	max_health *= 1.0 + float(character_level - 1) * 0.008
@@ -235,6 +239,7 @@ func take_damage(amount: float, area_damage: bool = false, source: Node = null) 
 		return
 	# Within the grace period, only the strongest hit counts. A weak hit cannot hide a boss hit.
 	var incoming := maxf(1.0, amount) if area_damage else maxf(maxf(1.0, amount * 0.30), amount - defense)
+	incoming *= 1.0 - permanent_damage_reduction
 	var actual := incoming - (protected_damage if invulnerability > 0.0 else 0.0)
 	if actual <= 0.0:
 		return

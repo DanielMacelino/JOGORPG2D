@@ -1,12 +1,20 @@
 extends Control
 const FOREST := preload("res://assets/art/forest_panorama.svg")
 const HOME := preload("res://assets/art/home-portal.png")
+const WORKSHOP := preload("res://assets/art/prepare-workshop.png")
 var home := true
 var records := false
+var forge := false
 var records_art: Texture2D
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 func _draw() -> void:
+	if forge:
+		var factor := maxf(size.x / WORKSHOP.get_width(), size.y / WORKSHOP.get_height())
+		var extent := WORKSHOP.get_size() * factor
+		draw_texture_rect(WORKSHOP, Rect2((size - extent) * 0.5, extent), false)
+		draw_rect(Rect2(Vector2.ZERO, size), Color("#04110f", 0.35 if size.x > 700 else 0.5))
+		return
 	if records:
 		if records_art == null: records_art = load("res://assets/art/records-background.png")
 		if records_art != null:

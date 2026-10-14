@@ -29,7 +29,7 @@ static func strength(tier: int, phase: int) -> float:
 	return (1.0 + float(phase - 1) * 0.055) * pow(1.32, minf(float(tier), 40.0)) * (1.0 + maxf(0.0, float(tier - 40)) * 0.15)
 
 static func reward_multiplier(tier: int, phase: int) -> float:
-	return (1.0 + float(tier) * 0.25 + float(phase - 1) * 0.035) * (1.25 if phase == 5 else 1.0)
+	return (1.0 + float(tier) * 0.25 + float(phase - 1) * 0.035) * (1.65 if phase == 10 else (1.25 if phase == 5 else 1.0))
 
 static func phase_objective(phase: int) -> String:
 	match ENCOUNTERS[clampi(phase - 1, 0, 9)]:
@@ -39,7 +39,7 @@ static func phase_objective(phase: int) -> String:
 		"rifts": return "DESAFIO DA METADE · Sele três fendas e enfrente o guardião fortalecido. +25% de ganhos; repita para aprimorar seu personagem."
 		"anomaly": return "Atravesse a tempestade arcana e derrote o guardião."
 		"siege": return "Elimine quatro campeões marcados durante o cerco e derrote o guardião."
-		"throne": return "Enfrente os campeões e a versão fortalecida do soberano regional."
+		"throne": return "TRONO DO SOBERANO · Chefe com vida massiva, ataques exclusivos e fúria final aos 25% de vida. +65% de ganhos."
 	return "Sobreviva às quatro ondas e derrote o guardião."
 
 static func expedition(map_id: String, phase: int, tier: int) -> MapData:

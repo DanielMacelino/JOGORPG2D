@@ -58,6 +58,12 @@ Use Godot 4.7.2 e instale os templates de exportação da mesma versão. Os pres
 
 No macOS, exporte como ZIP para preservar as permissões do aplicativo. O preset universal inclui Intel e Apple Silicon, com assinatura ad-hoc e sem notarização Apple. A execução em um Mac real ainda precisa ser validada.
 
-Para jogar entre Mac e Windows, use a mesma rede local ou uma VPN compatível com ambos. O Radmin VPN oferece versão apenas para Windows. Informe o IP do anfitrião na rede compartilhada e a mesma porta (padrão 24567 UDP). Todos devem usar o mesmo protocolo do jogo: `ashenwild-coop-6`.
+Para jogar entre Mac e Windows, use a mesma rede local ou uma VPN compatível com ambos. O Radmin VPN oferece versão apenas para Windows. Informe o IP do anfitrião na rede compartilhada e a mesma porta (padrão 24567 UDP). Todos devem usar o mesmo protocolo do jogo: `ashenwild-coop-7`.
 
 Em Configurações, RESETAR TODO O PROGRESSO reinicia os dados locais do jogador somente após confirmação.
+
+Inventário em grade de ícones com detalhes ao passar o mouse e ordem por poder; melhorias em sete patamares coletivos; três poderes ativos por partida com passivos livres; soberanos exclusivos na fase 10. Veja [as regras e a validação](docs/INVENTARIO_MESTRIA_E_SOBERANOS.md).
+
+O Arsenal também oferece [Transmutação](docs/TRANSMUTACAO.md): quatro itens livres viram um, com chance de elevar a raridade, animação, bônus garantidos por tentativas e suporte a cópias no inventário.
+
+Na Transmutação, os atributos do resultado aparecem em pop-up sobre a mesma tela. Todos os marcos ficam em uma lista compacta e a aba Trocas converte itens livres em ouro (Comum a Raro) ou cristais (Épico a Deus).

@@ -3,6 +3,8 @@ class_name AbilityManager
 
 signal loadout_changed
 
+const MAX_ACTIVE_POWERS := 3
+var innate_ability := &""
 var levels: Dictionary = {}
 var max_level := 5
 var class_id := "warrior"
@@ -14,6 +16,7 @@ func _ready() -> void:
 	rng.randomize()
 
 func reset(starting_ability: StringName = &"", owner: String = "warrior", tier: int = 0) -> void:
+	innate_ability = starting_ability
 	class_id = owner
 	expedition_level = 1
 	difficulty_tier = tier
@@ -29,19 +32,32 @@ func has_ability(id: StringName) -> bool:
 func level_of(id: StringName) -> int:
 	return maxi(int(levels.get(id, 0)), int(levels.get(str(id), 0)))
 
+func active_power_count() -> int:
+	var count := 0
+	for id in levels:
+		var ability: AbilityData = ContentCatalog.abilities.get(str(id))
+		if ability != null and ability.active_power and ability.id != innate_ability and level_of(ability.id) > 0:
+			count += 1
+	return count
+
+func can_learn(ability: AbilityData) -> bool:
+	return not ability.active_power or ability.id == innate_ability or level_of(ability.id) > 0 or active_power_count() < MAX_ACTIVE_POWERS
+
 func chooseable() -> Array[StringName]:
 	var candidates: Array[StringName] = []
 	for id in ContentCatalog.abilities:
 		var ability: AbilityData = ContentCatalog.abilities[str(id)]
-		if ability.unlock_only or not ability.available_to(class_id) or ability.required_run_level > expedition_level or ability.required_difficulty > difficulty_tier:
+		if (ability.unlock_only and ability.id != innate_ability) or not ability.available_to(class_id) or ability.required_run_level > expedition_level or ability.required_difficulty > difficulty_tier:
 			continue
-		if level_of(ability.id) < max_level:
+		if level_of(ability.id) < max_level and can_learn(ability):
 			candidates.append(ability.id)
 	return candidates
 
 func grant(id: StringName) -> bool:
 	var ability: AbilityData = ContentCatalog.abilities.get(str(id))
-	if ability == null or ability.unlock_only or not ability.available_to(class_id) or level_of(id) >= max_level or ability.required_run_level > expedition_level or ability.required_difficulty > difficulty_tier:
+	if ability == null or (ability.unlock_only and ability.id != innate_ability) or not ability.available_to(class_id) or level_of(id) >= max_level or ability.required_run_level > expedition_level or ability.required_difficulty > difficulty_tier:
+		return false
+	if not can_learn(ability):
 		return false
 	var next_rank := level_of(id) + 1
 	for key in levels.keys():
@@ -77,12 +93,20 @@ func roll_choices(count: int = 3) -> Array[AbilityData]:
 	var pool := chooseable()
 	var result: Array[AbilityData] = []	
 	while not pool.is_empty() and result.size() < count:
+		# Keep a power card available while building or upgrading the chosen trio.
+		var selection: Array[StringName] = []
+		if result.is_empty():
+			for id in pool:
+				if ContentCatalog.abilities[str(id)].active_power:
+					selection.append(id)
+		if selection.is_empty():
+			selection.assign(pool)
 		var total := 0.0
-		for id in pool:
+		for id in selection:
 			total += _get_weight(id)
 		var roll := rng.randf() * total
-		var selected: StringName = pool[0]
-		for id in pool:
+		var selected: StringName = selection[0]
+		for id in selection:
 			roll -= _get_weight(id)
 			if roll <= 0.0:
 				selected = id

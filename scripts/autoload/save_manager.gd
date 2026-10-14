@@ -20,6 +20,9 @@ const DEFAULT_SAVE := {
 	"selected_difficulty": 0,
 	"last_account_xp_gained": 0,
 	"equipment": ["field_blade", "moon_staff", "thorn_bow"],
+	"equipment_quantities": {},
+	"transmutation": {"attempts": {}, "failures": {}, "last_result": {}},
+	"equipment_exchange": {"sold": 0, "gold": 0, "crystals": 0, "last_receipt": {}},
 	"equipped": {"weapon": "field_blade"},
 	"selected_class": "warrior",
 	"class_loadouts": {
@@ -164,10 +167,14 @@ func spend_crystals(amount: int) -> bool:
 # ═══════════════════════════════════════════════
 # UPGRADES PERMANENTES
 # ═══════════════════════════════════════════════
-func buy_upgrade(upgrade_id: String, price: int) -> bool:
-	if not spend_gold(price):
+func buy_upgrade(upgrade_id: String, _displayed_price: int = -1) -> bool:
+	if GameManager.run_active or not PermanentUpgrades.can_buy(upgrade_id, data.upgrades):
 		return false
-	data.upgrades[upgrade_id] = int(data.upgrades.get(upgrade_id, 0)) + 1
+	var price := PermanentUpgrades.cost(upgrade_id, data.upgrades)
+	if int(data.gold) < price:
+		return false
+	data.gold = int(data.gold) - price
+	data.upgrades[upgrade_id] = upgrade_level(upgrade_id) + 1
 	save_game()
 	return true
 
@@ -180,7 +187,55 @@ func upgrade_level(id: String) -> int:
 func unlock_equipment(item_id: String) -> void:
 	if not data.equipment.has(item_id):
 		data.equipment.append(item_id)
+		data.equipment_quantities[item_id] = 1
 		save_game()
+
+func equipment_quantity(id: String) -> int:
+	return TransmutationRules.quantity(data, id)
+
+func transmute_equipment(inputs: Array, owner: String) -> Dictionary:
+	if GameManager.run_active or NetworkSession.running:
+		return {"ok": false, "reason": "A fusão não pode ser usada durante uma partida."}
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var transaction := TransmutationRules.resolve(data, inputs, owner, rng)
+	if not bool(transaction.ok): return transaction
+	var error := _commit_inventory_transaction(transaction.save)
+	if error != OK:
+		return {"ok": false, "reason": "Não foi possível salvar a fusão. Seus itens foram preservados."}
+	return {"ok": true, "result": transaction.result.duplicate(true)}
+
+func exchange_equipment(id: String, amount: int, owner: String) -> Dictionary:
+	if GameManager.run_active or NetworkSession.running:
+		return {"ok": false, "reason": "Trocas não podem ser realizadas durante uma partida."}
+	var transaction := EquipmentExchange.resolve(data, id, amount, owner)
+	if not bool(transaction.ok): return transaction
+	if _commit_inventory_transaction(transaction.save) != OK:
+		return {"ok": false, "reason": "Não foi possível salvar. O item e suas moedas foram preservados."}
+	return {"ok": true, "receipt": transaction.receipt.duplicate(true)}
+
+func acknowledge_transmutation() -> Error:
+	var updated := data.duplicate(true)
+	if updated.transmutation.last_result.is_empty(): return OK
+	updated.transmutation.last_result.pending = false
+	return _commit_inventory_transaction(updated)
+
+func _commit_inventory_transaction(updated: Dictionary) -> Error:
+	var temporary := SAVE_PATH + ".inventory_tmp"
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
+	if file == null: return FileAccess.get_open_error()
+	file.store_string(JSON.stringify(updated, "\t"))
+	file.flush()
+	var error := file.get_error()
+	file.close()
+	if error == OK:
+		error = DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary), ProjectSettings.globalize_path(SAVE_PATH))
+	if error != OK:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
+		return error
+	data = updated
+	progression_changed.emit()
+	return OK
 
 func set_selected_class(class_id: String) -> void:
 	if not is_class_unlocked(class_id):
@@ -258,7 +313,7 @@ func forge_item(recipe_id: String) -> bool:
 	if not can_forge(recipe_id): return false
 	# Verificar se tem os itens
 	for ing in recipe.get("ingredients", []):
-		if not data.equipment.has(ing.id):
+		if equipment_quantity(str(ing.id)) < int(ing.get("qty", 1)):
 			return false
 	# Verificar custos
 	if int(data.get("crystals", 0)) < int(recipe.get("crystal_cost", 0)):
@@ -269,7 +324,7 @@ func forge_item(recipe_id: String) -> bool:
 	var starters := _starter_weapons()
 	for ing in recipe.get("ingredients", []):
 		if not starters.has(ing.id):
-			data.equipment.erase(ing.id)
+			TransmutationRules.consume(data, str(ing.id), int(ing.get("qty", 1)))
 	var result_item: EquipmentData = ContentCatalog.equipment.get(str(recipe.result))
 	for owner in data.class_loadouts:
 		var loadout: Dictionary = data.class_loadouts[owner]
@@ -302,7 +357,7 @@ func can_forge(recipe_id: String) -> bool:
 		if item == null or not is_class_unlocked(str(item.class_id)) or int(data.highest_difficulty) < item.required_difficulty or not phase_unlocked(str(item.region_id), 1, item.required_difficulty): return false
 		if int(data.forge_upgrades.get(recipe_id, 0)) > 0 or data.equipment.has(str(recipe.result)): return false
 	for ing in recipe.get("ingredients", []):
-		if not data.equipment.has(ing.id):
+		if equipment_quantity(str(ing.id)) < int(ing.get("qty", 1)):
 			return false
 	if int(data.get("crystals", 0)) < int(recipe.get("crystal_cost", 0)):
 		return false

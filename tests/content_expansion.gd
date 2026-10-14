@@ -92,6 +92,9 @@ func run(tree: SceneTree) -> void:
 	panel.search.text_changed.emit(panel.search.text)
 	for frame in 5: await tree.process_frame
 	assert(panel.matched_recipes.size() == 4)
+	# Exercise pagination independently of the adaptive desktop page capacity.
+	panel.page_size = 2
+	panel._render()
 	var first: Array[String] = []
 	for card in panel.list.get_children(): first.append(str(card.get_meta("recipe_id")))
 	panel.next.pressed.emit()

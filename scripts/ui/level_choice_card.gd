@@ -61,10 +61,10 @@ func _build_text() -> void:
 	if fit_to_slot: title.add_theme_font_override("font", serif_font)
 	content.add_child(title)
 	var tag := "NÍVEL %d → %d" % [current_rank, current_rank + 1]
-	var scope := "COMPARTILHADA" if ability.class_ids.is_empty() else "DA CLASSE"
+	var scope := ("PODER" if ability.active_power else "PASSIVO") + (" GERAL" if ability.class_ids.is_empty() else " DE CLASSE")
 	var rarity_line := "◆  %s  ·  %s  ·  %s" % [_rarity_name(str(ability.rarity)).to_upper(), tag, scope]
 	if fit_to_slot:
-		rarity_line = "%s · %s · %s" % [tag, _rarity_name(str(ability.rarity)), "GERAL" if ability.class_ids.is_empty() else "CLASSE"]
+		rarity_line = "%s · %s · %s" % [tag, _rarity_name(str(ability.rarity)), "PODER" if ability.active_power else "PASSIVO"]
 	content.add_child(_make_label(rarity_line, detail_size, accent))
 	content.add_child(_make_label(ability.rank_description(current_rank + 1), body_size, STYLE.TEXT))
 	content.minimum_size_changed.connect(_fit_text_height)

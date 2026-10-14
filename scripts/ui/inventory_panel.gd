@@ -2,6 +2,7 @@ extends VBoxContainer
 ## Arsenal composition, owned-item filters and equipment updates without rebuilding the page.
 signal filter_changed(slot: String)
 signal forge_requested
+signal transmutation_requested
 signal back_requested
 const ART := preload("res://scripts/ui/wild_theme.gd")
 const ORBIT := preload("res://scripts/ui/equipment_orbit.gd")
@@ -22,7 +23,7 @@ var filter_dropdown: OptionButton
 var count_label: Label
 var item_scroll: Control
 var page_index := 0
-var page_size := 3
+var page_size := 12
 var previous_page: Button
 var next_page: Button
 var page_label: Label
@@ -30,7 +31,7 @@ var section_row: HBoxContainer
 var section_index := 0
 var hero_frame: PanelContainer
 var inventory_frame: PanelContainer
-var item_list: VBoxContainer
+var item_list: GridContainer
 var visible_item_ids: Array[String] = []
 var compact_rows := false
 
@@ -117,21 +118,38 @@ func _ready() -> void:
 	heading.add_child(filter_dropdown)
 	item_scroll = PanelContainer.new()
 	item_scroll.name = "OwnedItems"
-	item_scroll.custom_minimum_size.y = 336
+	item_scroll.custom_minimum_size.y = 232
 	item_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	item_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	(item_scroll as PanelContainer).add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	inventory_column.add_child(item_scroll)
-	item_list = VBoxContainer.new()
+	item_list = GridContainer.new()
+	item_list.columns = 4
 	item_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	item_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	item_list.add_theme_constant_override("separation", 8)
+	item_list.add_theme_constant_override("h_separation", 8)
+	item_list.add_theme_constant_override("v_separation", 8)
 	item_scroll.add_child(item_list)
+	item_scroll.resized.connect(_layout_grid)
 	_build_pagination()
-	inventory_column.add_child(_label("Clique nos espaços do personagem para filtrar. Use EQUIPAR para trocar o item.", 11, ART.MUTED))
+	inventory_column.add_child(_label("Mais fortes primeiro. Passe o mouse para ver detalhes; clique no ícone para equipar.", 11, ART.MUTED))
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	inventory_column.add_child(actions)
 	var forge := _button("IR PARA A FORJA", false)
+	forge.name = "OpenForge"
+	forge.autowrap_mode = TextServer.AUTOWRAP_OFF
+	forge.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	forge.clip_text = true
+	forge.size_flags_horizontal = SIZE_EXPAND_FILL
 	forge.pressed.connect(func() -> void: forge_requested.emit())
-	inventory_column.add_child(forge)
+	actions.add_child(forge)
+	var transmute := _button("TRANSMUTAR", true)
+	transmute.name = "OpenTransmutation"
+	transmute.size_flags_horizontal = SIZE_EXPAND_FILL
+	transmute.tooltip_text = "Reaproveite quatro itens não equipados e tente obter uma raridade superior."
+	transmute.pressed.connect(func() -> void: transmutation_requested.emit())
+	actions.add_child(transmute)
 	resized.connect(_layout)
 	_refresh_items()
 	_layout()
@@ -180,14 +198,26 @@ func owned_items() -> Array[EquipmentData]:
 	return items
 
 func _sort_items(a: EquipmentData, b: EquipmentData) -> bool:
-	var loadout := SaveManager.loadout_for(class_id)
-	var a_equipped := str(loadout.get(str(a.slot), "")) == str(a.id)
-	var b_equipped := str(loadout.get(str(b.slot), "")) == str(b.id)
-	if a_equipped != b_equipped:
-		return a_equipped
-	var a_slot: int = FILTER_SLOTS.find(str(a.slot))
-	var b_slot: int = FILTER_SLOTS.find(str(b.slot))
-	return a_slot < b_slot if a_slot != b_slot else a.display_name.naturalnocasecmp_to(b.display_name) < 0
+	var a_power := a.power_score()
+	var b_power := b.power_score()
+	if not is_equal_approx(a_power, b_power):
+		return a_power > b_power
+	var a_tier := ItemTiers.index(str(a.rarity))
+	var b_tier := ItemTiers.index(str(b.rarity))
+	if a_tier != b_tier:
+		return a_tier > b_tier
+	return str(a.id).naturalnocasecmp_to(str(b.id)) < 0
+
+func _layout_grid() -> void:
+	if item_list == null or item_scroll.size.x <= 0:
+		return
+	var columns := clampi(floori((item_scroll.size.x + 8.0) / 72.0), 2, 8)
+	if columns == item_list.columns:
+		return
+	item_list.columns = columns
+	page_size = columns * 3
+	page_index = 0
+	_refresh_items()
 
 func select_filter(slot: String) -> void:
 	if not FILTER_SLOTS.has(slot):
@@ -225,7 +255,13 @@ func _refresh_items() -> void:
 	previous_page.disabled = page_index == 0
 	next_page.disabled = page_index >= pages - 1
 	page_label.text = "%d / %d" % [page_index + 1, pages]
-	count_label.text = "%d itens" % items.size() if selected_slot.is_empty() else "%d de %d itens" % [visible_item_ids.size(), items.size()]
+	var total_units := 0
+	var filtered_units := 0
+	for item in items:
+		var units := SaveManager.equipment_quantity(str(item.id))
+		total_units += units
+		if selected_slot.is_empty() or str(item.slot) == selected_slot: filtered_units += units
+	count_label.text = "%d itens · %d tipos" % [total_units, items.size()] if selected_slot.is_empty() else "%d de %d itens · %d tipos" % [filtered_units, total_units, visible_item_ids.size()]
 	if visible_item_ids.is_empty():
 		var empty_box := VBoxContainer.new()
 		empty_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -249,49 +285,71 @@ func _refresh_items() -> void:
 
 func _add_item(item: EquipmentData) -> void:
 	var active := str(SaveManager.loadout_for(class_id).get(str(item.slot), "")) == str(item.id)
-	var rarity := str(item.rarity)
-	var accent: Color = ART.RARITY_COLORS.get(rarity, ART.GOLD)
-	var card := PanelContainer.new()
-	card.set_meta("item_id", str(item.id))
-	var style := ART.panel(Color("#10281f") if active else Color("#081712"), 10)
+	var accent: Color = ART.RARITY_COLORS.get(str(item.rarity), ART.GOLD)
+	var button := ItemButton.new()
+	button.name = "EquipItem"
+	button.set_meta("item_id", str(item.id))
+	button.set_meta("power", item.power_score())
+	button.custom_minimum_size = Vector2(64, 72)
+	button.size_flags_horizontal = SIZE_EXPAND_FILL
+	button.size_flags_vertical = SIZE_SHRINK_BEGIN
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.disabled = active
+	var style := ART.panel(Color("#173e2d") if active else Color("#081712"), 4)
 	style.border_color = ART.GREEN if active else accent
-	style.border_width_left = 2
-	card.add_theme_stylebox_override("panel", style)
-	item_list.add_child(card)
-	var row := BoxContainer.new()
-	row.vertical = false
-	row.add_theme_constant_override("separation", 10)
-	card.add_child(row)
-	var item_heading := HBoxContainer.new()
-	item_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	item_heading.add_theme_constant_override("separation", 10)
-	row.add_child(item_heading)
+	style.set_border_width_all(2 if active else 1)
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("disabled", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("#244235")
+	hover.set_border_width_all(2)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("focus", hover)
+	button.add_theme_stylebox_override("pressed", hover)
+	var details := "%s\n%s · %s\nPODER: %.1f\n%s" % [item.display_name, ORBIT.SLOT_NAMES.get(str(item.slot), str(item.slot)), RARITY_NAMES.get(str(item.rarity), str(item.rarity)), item.power_score(), item.description]
+	if item.region_id != &"" and ContentCatalog.maps.has(str(item.region_id)):
+		details += "\nOrigem: " + ContentCatalog.maps[str(item.region_id)].display_name
+	var quantity := SaveManager.equipment_quantity(str(item.id))
+	details += "\nQuantidade: %d" % quantity
+	button.tooltip_text = details + ("\nEQUIPADO" if active else "\nClique para equipar")
+	button.pressed.connect(equip_item.bind(str(item.id)))
+	item_list.add_child(button)
 	var icon := ICON.new()
 	icon.item = item
 	icon.class_id = class_id
-	icon.framed = true
-	icon.custom_minimum_size = Vector2(40, 50) if compact_rows else Vector2(60, 70)
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	item_heading.add_child(icon)
-	var copy := VBoxContainer.new()
-	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	copy.alignment = BoxContainer.ALIGNMENT_CENTER
-	copy.add_theme_constant_override("separation", 3)
-	item_heading.add_child(copy)
-	copy.add_child(_label(item.display_name + ("  ✓" if active else ""), 12 if compact_rows else 16, ART.TEXT))
-	copy.add_child(_label("%s · %s%s" % [ORBIT.SLOT_NAMES.get(str(item.slot), str(item.slot).to_upper()), RARITY_NAMES.get(rarity, rarity.to_upper()), " · EQUIPADO" if active else ""], 10, ART.GREEN if active else accent))
-	copy.add_child(_label(item.description, 11 if compact_rows else 12, ART.TEXT))
-	if item.region_id != &"" and ContentCatalog.maps.has(str(item.region_id)):
-		copy.add_child(_label("ACHADO DE " + ContentCatalog.maps[str(item.region_id)].display_name.to_upper(), 9, ART.GOLD))
-	var equip := _button("EM USO ✓" if active else "EQUIPAR", not active)
-	equip.name = "EquipItem"
-	equip.set_meta("item_id", str(item.id))
-	equip.custom_minimum_size.x = 64 if compact_rows else 94
-	equip.size_flags_horizontal = Control.SIZE_SHRINK_END
-	equip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	equip.disabled = active
-	equip.pressed.connect(equip_item.bind(str(item.id)))
-	row.add_child(equip)
+	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 7
+	icon.offset_right = -7
+	icon.offset_top = 7
+	icon.offset_bottom = -7
+	button.add_child(icon)
+	if quantity > 1:
+		var copies := _label("×%d" % quantity, 12, ART.TEXT)
+		copies.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		copies.offset_top = -20
+		copies.offset_bottom = -2
+		copies.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.add_child(copies)
+	if active:
+		var mark := _label("✓", 16, ART.GREEN)
+		mark.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		mark.position = Vector2(-20, 2)
+		button.add_child(mark)
+
+class ItemButton extends Button:
+	func _make_custom_tooltip(for_text: String) -> Object:
+		var panel := PanelContainer.new()
+		var style := ART.panel(Color("#071811"), 12)
+		style.border_color = ART.GOLD
+		panel.add_theme_stylebox_override("panel", style)
+		var label := Label.new()
+		label.text = for_text
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size.x = minf(330.0, get_viewport_rect().size.x - 48.0)
+		label.add_theme_font_size_override("font_size", 13)
+		label.add_theme_color_override("font_color", Color("#f1ead5"))
+		panel.add_child(label)
+		return panel
 
 func equip_item(id: String) -> bool:
 	var item: EquipmentData = ContentCatalog.equipment.get(id)

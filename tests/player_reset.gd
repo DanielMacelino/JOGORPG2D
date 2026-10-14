@@ -19,6 +19,9 @@ func run(tree: SceneTree) -> void:
 	save.data.selected_phase = 8
 	save.data.selected_difficulty = 6
 	save.data.equipment.append("oath_hammer")
+	save.data.equipment_quantities = {"oath_hammer": 12}
+	save.data.equipment_exchange = {"sold": 42, "gold": 300, "crystals": 10, "last_receipt": {"total": 10}}
+	save.data.transmutation = {"attempts": {"common": 123}, "failures": {"common": 4}, "last_result": {"pending": true}}
 	save.data.class_loadouts.paladin = {"weapon": "oath_hammer"}
 	save.data.equipped = save.data.class_loadouts.paladin.duplicate()
 	save.data.settings.ui_scale = 1.15
@@ -53,6 +56,7 @@ func run(tree: SceneTree) -> void:
 	game_manager.run_active = false
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	tree.root.add_child(main)
+	main.transmutation_draft = {"selected": ["oath_hammer"], "tab": 1}
 	main.online_draft = {"nickname": "Old", "phase": 8}
 	main.forge_draft = {"class": "paladin", "page": 5}
 	tree.root.get_node("NetworkSession").config = {"map": "frostwood", "tier": 6}
