@@ -62,10 +62,11 @@ var boss_panel: VBoxContainer
 var boss_bar: ProgressBar
 var boss_name_label: Label
 var pause_layer: Control
+var pause_settings_layer: Control
 var level_layer: Control
 var result_layer: Control
 var attack_clock := 0.0
-var special_clocks: Dictionary = {"ember_orb": 2.0, "thorn_aura": 0.0, "storm_arc": 2.0, "starfall": 3.0, "blade_storm": 1.0, "time_warp": 2.0, "void_rift": 3.0, "challenge_shout": 1.0, "glacial_ring": 1.0, "volley": 1.0, "shadow_burst": 1.0, "ancient_guardian": 1.0, "roots_snare": 1.0, "sunfire": 1.0}
+var special_clocks: Dictionary = {"binding_shot": 1.0, "arrow_rain": 2.0, "dagger_fan": 1.0,"nature_pack": 1.0, "living_grove": 1.0, "arcane_bloom": 2.0, "ember_orb": 2.0, "thorn_aura": 0.0, "storm_arc": 2.0, "starfall": 3.0, "blade_storm": 1.0, "time_warp": 2.0, "void_rift": 3.0, "challenge_shout": 1.0, "glacial_ring": 1.0, "volley": 1.0, "shadow_burst": 1.0, "ancient_guardian": 1.0, "roots_snare": 1.0, "sunfire": 1.0}
 var pending_levelups := 0
 var pending_level_equipment: Array[String] = []
 var enemies_defeated := 0
@@ -85,6 +86,8 @@ var reward: Dictionary = {}
 var reward_banked := false
 var boss_music_active := false
 var run_items: Array[Dictionary] = []
+var mimic_loot_awarded := false
+var drop_receipt := Crypto.new().generate_random_bytes(16).hex_encode()
 var attack_count := 0
 var notice_label: Label
 var modal_panels: Array[PanelContainer] = []
@@ -101,6 +104,7 @@ func _ready() -> void:
 	abilities.reset(player.class_data.starting_ability, player_class, difficulty_tier)
 	_apply_starting_ability()
 	wave_director.start()
+	if not online_remote: AudioManager.match_music(true)
 
 func _build_world() -> void:
 	var ground := GROUND_SCRIPT.new()
@@ -191,7 +195,7 @@ func _process(delta: float) -> void:
 		summon_clock -= delta
 		if summon_clock <= 0.0:
 			summon_clock = 18.0
-			_summon_companions("wolf", 2 + player.summon_count, 14.0 + player.summon_duration)
+			_summon_companions("rootling", 2 + player.summon_count, 16.0 + player.summon_duration)
 	if player_class == "warrior":
 		taunt_clock -= delta
 		if taunt_clock <= 0.0:
@@ -215,7 +219,7 @@ func _process(delta: float) -> void:
 		_update_boss_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause") and not run_finished:
+	if not event.is_echo() and event.is_action_pressed("pause") and not run_finished:
 		_toggle_pause()
 
 func _build_hud() -> void:
@@ -233,6 +237,10 @@ func _build_hud() -> void:
 	ui_root.scale = Vector2.ONE
 	layer.add_child(ui_root)
 	ui_root.theme = STYLE.create_theme()
+	var pause_keyboard := preload("res://scripts/ui/pause_keyboard.gd").new()
+	pause_keyboard.action = _toggle_pause
+	pause_keyboard.allowed = func() -> bool: return not run_finished and not is_queued_for_deletion() and (level_layer == null or pause_layer != null)
+	ui_root.add_child(pause_keyboard)
 	skill_rail = HFlowContainer.new()
 	skill_rail.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	skill_rail.offset_left = -210
@@ -423,9 +431,29 @@ func _on_boss_summoned(boss_id: StringName) -> void:
 	_spawn_skill(boss.global_position, "void", 110.0, Color("#ffd08e"))
 	_show_notice("O GUARDIÃO DESPERTA   ·   " + boss.data.display_name.to_upper())
 
+func _award_mimic_loot(at: Vector2) -> void:
+	if mimic_loot_awarded: return
+	var drop := loot.roll_boss_reward(map_id, player_class, phase_number, null, difficulty_tier)
+	var id := str(drop.equipment)
+	if SaveManager.grant_equipment_drop(id, drop_receipt + ":loot_mimic", player_class) != OK:
+		_show_notice("NÃO FOI POSSÍVEL SALVAR O ITEM DO BAÚ")
+		return
+	mimic_loot_awarded = true
+	run_items.append({"id": id, "source": "miniboss", "duplicate": false})
+	_reveal_mimic_loot(id, at)
+
+func _reveal_mimic_loot(item_id: String, at: Vector2) -> void:
+	var effect := preload("res://scenes/effects/equipment_reveal.tscn").instantiate()
+	effect.item_id = item_id
+	effect.position = at
+	add_child(effect)
+	AudioManager.feedback("talent")
+	_show_notice("TESOURO DO BAÚ · " + ContentCatalog.equipment[item_id].display_name)
+
 func _on_enemy_died(enemy: ChaserEnemy) -> void:
 	if run_finished:
 		return
+	if enemy.kind == &"loot_mimic": _award_mimic_loot(enemy.global_position)
 	enemies_defeated += 1
 	_record_kill(str(enemy.kind))
 	if enemy.data.elite:
@@ -515,6 +543,7 @@ func _set_boss_music(enabled: bool) -> void:
 func _exit_tree() -> void:
 	if not online_remote:
 		AudioManager.boss_music(false)
+		AudioManager.match_music(false)
 
 func _spawn_skill(at: Vector2, kind: String, radius: float, color: Color, direction := Vector2.RIGHT) -> void:
 	if get_tree().get_nodes_in_group("skill_effect").size() >= 24:
@@ -528,14 +557,18 @@ func _spawn_skill(at: Vector2, kind: String, radius: float, color: Color, direct
 	add_child(effect)
 
 func _animate_skill(id: String, rank: int, target: Vector2) -> void:
-	var styles := {"challenge_shout": "taunt", "glacial_ring": "frost", "roots_snare": "roots", "sunfire": "holy", "volley": "arrows", "shadow_burst": "shadow", "ancient_guardian": "summon", "ember_orb": "fire", "thorn_aura": "roots", "storm_arc": "arcane", "starfall": "starfall", "blade_storm": "blades", "time_warp": "time", "void_rift": "void"}
+	if id == "arcane_bloom":
+		player.play_attack((target - player.global_position).normalized(), false, &"magic", true)
+		return
+	var styles := {"binding_shot": "arrows", "arrow_rain": "arrow_rain", "dagger_fan": "shadow","nature_pack": "summon", "living_grove": "roots", "challenge_shout": "taunt", "glacial_ring": "frost", "roots_snare": "roots", "sunfire": "holy", "volley": "arrows", "shadow_burst": "shadow", "ancient_guardian": "summon", "ember_orb": "fire", "thorn_aura": "roots", "storm_arc": "arcane", "starfall": "starfall", "blade_storm": "blades", "time_warp": "time", "void_rift": "void"}
 	var colors := {"frost": Color("#a4f1ff"), "roots": Color("#a1ffa9"), "holy": Color("#ffe2a1"), "arrows": Color("#eaffaf"), "shadow": Color("#e3aaff"), "summon": Color("#96ffd1"), "fire": Color("#ffb278"), "blades": Color("#fff1c9"), "void": Color("#c1a0ff"), "time": Color("#a4e2ef"), "taunt": Color("#ffce87"), "starfall": Color("#d9a8ff"), "arcane": Color("#a4e6ff")}
+	colors["arrow_rain"] = Color("#d8f79e")
 	var kind: String = styles.get(id, "arcane")
-	var radius: float = {"glacial_ring": 115.0 + rank * 15.0, "roots_snare": 115.0 + rank * 15.0, "sunfire": 115.0 + rank * 15.0, "thorn_aura": 102.0 + rank * 7.0, "blade_storm": 150.0 + rank * 8.0, "void_rift": 210.0 + rank * 14.0, "time_warp": 220.0}.get(id, 95.0)
-	var center := target if id in ["glacial_ring", "starfall"] else player.global_position
+	var radius: float = {"arrow_rain": 110.0 + rank * 12.0, "glacial_ring": 115.0 + rank * 15.0, "roots_snare": 115.0 + rank * 15.0, "sunfire": 115.0 + rank * 15.0, "thorn_aura": 102.0 + rank * 7.0, "blade_storm": 150.0 + rank * 8.0, "void_rift": 210.0 + rank * 14.0, "time_warp": 220.0}.get(id, 95.0)
+	var center := target if id in ["glacial_ring", "starfall", "arrow_rain"] else player.global_position
 	var direction := (target - player.global_position).normalized()
 	if id != "thorn_aura":
-		player.play_attack(direction, false, player.class_data.attack_style)
+		player.play_attack(direction, false, player.class_data.attack_style, true)
 	_spawn_skill(center, kind, radius, colors[kind], direction)
 
 func _spawn_burst(at: Vector2, radius: float, color: Color) -> void:
@@ -713,7 +746,7 @@ func _cast_class_power() -> void:
 		power_clock = 0.5
 		return
 	var power_kind: String = {"warrior": "taunt", "mage": "arcane", "ranger": "arrows", "assassin": "shadow", "druid": "summon", "paladin": "holy"}.get(player_class, "arcane")
-	player.play_attack((targets[0].global_position - player.global_position).normalized(), true, player.class_data.attack_style)
+	player.play_attack((targets[0].global_position - player.global_position).normalized(), true, player.class_data.attack_style, true)
 	_spawn_skill(player.global_position, power_kind, 180.0, player.tint.lightened(0.25), player.attack_direction)
 	var multiplier := 2.8
 	var radius := 170.0
@@ -753,11 +786,10 @@ func _cast_class_power() -> void:
 					break
 			return
 		"druid":
-			power_clock = 10.0
-			multiplier = 2.0
-			radius = 188.0
-			player.heal(player.max_health * 0.20)
+			power_clock = 14.0
+			player.heal(player.max_health * 0.15)
 			_summon_companions("ancient", 1, 18.0 + player.summon_duration)
+			return
 		"paladin":
 			power_clock = 9.0
 			multiplier = 2.6
@@ -773,24 +805,33 @@ func _cast_class_power() -> void:
 func configure_projectile(projectile: Node2D) -> void:
 	projectile.source_player = player
 	projectile.bounces_left = player.projectile_bounces if not projectile.magic else 0
-	projectile.burn_on_hit = player.burn_on_hit
-	projectile.chill_on_hit = player.chill_on_hit
+	projectile.burn_on_hit = maxf(projectile.burn_on_hit, player.burn_on_hit)
+	projectile.chill_on_hit = maxf(projectile.chill_on_hit, player.chill_on_hit)
 
 func _record_ability_use(id: String) -> void:
 	if not online_remote:
 		SaveManager.record_ability_use(id)
 
 func _record_kill(kind: String) -> void:
-	SaveManager.record_kill(kind)
+	SaveManager.record_kill(kind, player_class)
 
 func _cast_special(id: String, rank: int) -> void:
-	var nearest := _nearest_enemies(player.global_position, 390.0, 4)
+	var reach := maxf(390.0, player.attack_range) if player_class in ["mage", "ranger"] else 390.0
+	var nearest := _nearest_enemies(player.global_position, reach, 4)
 	if nearest.is_empty():
 		special_clocks[id] = 0.5
 		return
 	_record_ability_use(id)
 	_animate_skill(id, rank, nearest[0].global_position)
 	match id:
+		"arcane_bloom":
+			special_clocks[id] = 8.0 - rank * 0.5
+			var bloom := preload("res://scenes/effects/arcane_bloom.tscn").instantiate()
+			bloom.radius = 130.0 + rank * 16.0
+			bloom.position = player.global_position
+			var struck := {}
+			bloom.expansion_pulse.connect(_bloom_pulse.bind(bloom, struck, player.damage * (1.0 + rank * 0.30) * (1.0 + player.power_damage)))
+			add_child(bloom)
 		"challenge_shout":
 			special_clocks[id] = 8.0
 			_provoke_enemies(300.0 + rank * 35.0, 2.5 + rank * 0.5)
@@ -807,19 +848,40 @@ func _cast_special(id: String, rank: int) -> void:
 				if id != "sunfire" and not enemy.dead:
 					enemy.apply_slow(0.35 + rank * 0.06, 2.0 + rank * 0.2)
 			_spawn_burst(center, radius, color)
-		"volley":
-			special_clocks[id] = 8.0 - rank * 0.5
+		"binding_shot":
+			special_clocks[id] = 7.5 - rank * 0.4
+			var arrow := PROJECTILE_SCRIPT.new()
+			arrow.player_team = true
+			arrow.source_player = player
+			arrow.enemy_manager = enemy_manager
+			arrow.position = player.global_position
+			arrow.direction = (nearest[0].global_position - player.global_position).normalized()
+			arrow.speed = player.projectile_speed
+			arrow.damage = player.damage * (0.9 + rank * 0.18)
+			arrow.pierce_left = 1 + player.projectile_pierce
+			arrow.chill_on_hit = 0.35 + rank * 0.04
+			arrow.color = Color("#a1f28c")
+			add_child(arrow)
+		"arrow_rain":
+			special_clocks[id] = 9.0 - rank * 0.4
+			var center: Vector2 = nearest[0].global_position
+			var radius := 110.0 + rank * 12.0
+			for enemy in _nearest_enemies(center, radius, 24):
+				enemy.take_hit(player.damage * (0.7 + rank * 0.2))
+		"volley", "dagger_fan":
+			special_clocks[id] = (7.0 - rank * 0.4) if id == "dagger_fan" else (8.0 - rank * 0.5)
 			var direction: Vector2 = (nearest[0].global_position - player.global_position).normalized()
 			for index in 3 + rank:
 				var arrow := PROJECTILE_SCRIPT.new()
 				arrow.player_team = true
+				arrow.source_player = player
 				arrow.enemy_manager = enemy_manager
 				arrow.position = player.global_position
-				arrow.direction = direction.rotated((float(index) - float(2 + rank) * 0.5) * 0.12)
+				arrow.direction = direction.rotated((float(index) - float(2 + rank) * 0.5) * (0.19 if id == "dagger_fan" else 0.12))
 				arrow.speed = player.projectile_speed
-				arrow.damage = player.damage * (0.65 + rank * 0.12)
+				arrow.damage = player.damage * ((0.5 + rank * 0.14) if id == "dagger_fan" else (0.65 + rank * 0.12))
 				arrow.pierce_left = 1 + player.projectile_pierce
-				arrow.color = Color("#eaffaf")
+				arrow.color = Color("#c8a2ff") if id == "dagger_fan" else Color("#eaffaf")
 				add_child(arrow)
 		"shadow_burst":
 			special_clocks[id] = 6.0 - rank * 0.4
@@ -829,6 +891,12 @@ func _cast_special(id: String, rank: int) -> void:
 		"ancient_guardian":
 			special_clocks[id] = 22.0 - rank
 			_summon_companions("guardian", 1 + floori(float(rank - 1) / 2.0), 12.0 + rank * 2.0 + player.summon_duration, rank)
+		"nature_pack":
+			special_clocks[id] = 20.0 - rank * 0.5
+			_summon_companions("wolf", 1 + floori(float(rank) / 2.0), 12.0 + rank * 2.0 + player.summon_duration, rank)
+		"living_grove":
+			special_clocks[id] = 21.0 - rank * 0.5
+			_summon_companions("grove_tree", 1 + floori(float(rank - 1) / 2.0), 11.0 + rank * 2.0 + player.summon_duration, rank)
 		"ember_orb":
 			special_clocks[id] = maxf(2.1, 5.2 - rank * 0.36)
 			var target: ChaserEnemy = nearest[0]
@@ -898,6 +966,18 @@ func _cast_special(id: String, rank: int) -> void:
 				enemy.take_hit(player.damage * (2.0 + rank * 0.45))
 			_spawn_burst(player.global_position, 210.0 + rank * 14.0, Color("#b5a0c9"))
 
+func _bloom_pulse(reach: float, effect: Node2D, struck: Dictionary, amount: float) -> void:
+	if run_finished or player.is_dead or not is_instance_valid(enemy_manager): return
+	var previous_source: SurvivorPlayer = enemy_manager.damage_source
+	enemy_manager.damage_source = player
+	for enemy in _nearest_enemies(effect.global_position, reach, EnemyManager.MAX_ENEMIES):
+		var id := enemy.get_instance_id()
+		if struck.has(id): continue
+		struck[id] = true
+		enemy.take_hit(amount)
+		if run_finished: break
+	enemy_manager.damage_source = previous_source
+
 func _provoke_enemies(radius: float, duration: float) -> void:
 	var found := false
 	for enemy in _nearest_enemies(player.global_position, radius, 144):
@@ -907,12 +987,14 @@ func _provoke_enemies(radius: float, duration: float) -> void:
 		_spawn_skill(player.global_position, "taunt", 110.0, Color("#f8c777"))
 
 func _summon_companions(kind: String, count: int, duration: float, rank: int = 1) -> void:
+	var limit := 6 if kind == "rootling" else (4 if kind == "wolf" else (1 if kind == "ancient" else 3))
+	count = clampi(count, 1, limit)
 	# Recasting replaces spirits of the same kind; a long duration never creates unlimited armies.
 	for companion in get_tree().get_nodes_in_group("forest_companion"):
 		if companion.summoner == player and companion.kind == kind:
 			companion.remove_from_group("forest_companion")
 			companion.queue_free()
-	player.play_attack(player.facing, false, &"magic")
+	player.play_attack(player.facing, false, &"magic", true)
 	_spawn_skill(player.global_position, "summon", 75.0, Color("#96ffd1"))
 	for index in count:
 		var companion := COMPANION_SCRIPT.new()
@@ -921,7 +1003,7 @@ func _summon_companions(kind: String, count: int, duration: float, rank: int = 1
 		companion.kind = kind
 		companion.rank = rank
 		companion.remaining = duration
-		companion.position = player.global_position + Vector2.from_angle(float(index) * TAU / maxf(1, count)) * 44.0
+		companion.position = player.global_position + Vector2.from_angle(float(index) * TAU / maxf(1, count)) * (92.0 if kind == "grove_tree" else 44.0)
 		add_child(companion)
 
 func _show_level_choices() -> void:
@@ -986,6 +1068,7 @@ func _on_viewport_resized() -> void:
 func _apply_stat_ability(ability: AbilityData) -> void:
 	_spawn_skill(player.global_position, "arcane", 45.0, STYLE.RARITY_COLORS.get(str(ability.rarity), player.tint))
 	var old_duration := player.summon_duration
+	var old_count := player.summon_count
 	player.rebuild_run_stats(abilities.accumulated_bonuses())
 	if ability.stat == &"health":
 		player.heal(player.max_health * 0.20)
@@ -996,10 +1079,11 @@ func _apply_stat_ability(ability: AbilityData) -> void:
 			if companion.summoner == player:
 				companion.remaining += player.summon_duration - old_duration
 				companion.full_duration += player.summon_duration - old_duration
-	if ability.id == &"wolf_pack":
+	if player_class == "druid" and (ability.id == &"wolf_pack" or player.summon_count > old_count):
 		summon_clock = 0.0
 
 func _toggle_pause() -> void:
+	if _close_pause_settings(): return
 	if run_finished:
 		return
 	if pause_layer != null:
@@ -1021,13 +1105,7 @@ func _toggle_pause() -> void:
 	_ui_label(content, "EXPEDIÇÃO EM PAUSA", 23, GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_ui_label(content, "Até as raízes precisam respirar.", 12, Color("#aebfba"), HORIZONTAL_ALIGNMENT_CENTER)
 	_ui_button(content, "CONTINUAR", _toggle_pause, true)
-	var volume := HSlider.new()
-	volume.min_value = 0.0
-	volume.max_value = 1.0
-	volume.step = 0.05
-	volume.value = float(SaveManager.data.settings.master)
-	volume.value_changed.connect(_setting_master_changed)
-	content.add_child(volume)
+	_ui_button(content, "CONFIGURAÇÕES", _open_pause_settings, false).name = "OpenPauseSettings"
 	_ui_button(content, "REINICIAR EXPEDIÇÃO", _confirm_restart, false)
 	_ui_button(content, "SAIR PARA O MENU", _confirm_menu, false)
 
@@ -1037,6 +1115,23 @@ func _setting_master_changed(value: float) -> void:
 	var bus := AudioServer.get_bus_index("Master")
 	if bus >= 0:
 		AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(value, 0.001)))
+
+func _open_pause_settings() -> void:
+	if not is_instance_valid(pause_layer) or is_instance_valid(pause_settings_layer): return
+	pause_layer.hide()
+	pause_settings_layer = _make_modal()
+	var panel := _result_panel(pause_settings_layer, 450)
+	var settings := preload("res://scripts/ui/pause_settings_panel.gd").new()
+	settings.back_requested.connect(_close_pause_settings)
+	settings.interface_changed.connect(func() -> void: hud_layout_dirty = true)
+	panel.add_child(_pad(settings, 16, 12, 16, 12))
+
+func _close_pause_settings() -> bool:
+	if not is_instance_valid(pause_settings_layer): return false
+	pause_settings_layer.queue_free()
+	pause_settings_layer = null
+	if is_instance_valid(pause_layer): pause_layer.show()
+	return true
 
 func _setting_ui_scale_changed(value: float) -> void:
 	SaveManager.data.settings.ui_scale = value
@@ -1071,27 +1166,29 @@ func _on_player_died() -> void:
 	_finish_run(false)
 
 func _finish_run(victory: bool) -> void:
+	_close_pause_settings()
 	if run_finished:
 		return
 	run_finished = true
 	_set_boss_music(false)
+	AudioManager.match_music(false)
 	if victory and not reward_banked and not reward.is_empty():
 		reward_banked = true
 		var item_id := str(reward.equipment)
-		if SaveManager.data.equipment.has(item_id):
+		if SaveManager.equipment_quantity(item_id, player_class) > 0:
 			reward.gold = int(reward.gold) + 100
 			reward["duplicate"] = true
 		else:
-			SaveManager.unlock_equipment(item_id)
+			SaveManager.unlock_equipment(item_id, player_class)
 		run_items.append({"id": item_id, "source": "boss", "duplicate": bool(reward.get("duplicate", false))})
 		SaveManager.data.crystals = int(SaveManager.data.get("crystals", 0)) + int(reward.get("crystals", 1))
 		run_gold += int(reward.gold)
 	wave_director.stop()
 	var playtime_val := wave_director.match_time if wave_director != null else 0.0
 	var damage_dealt := float(player.get("total_damage_dealt") if player != null and player.get("total_damage_dealt") != null else 0.0)
-	SaveManager.record_run(wave_director.wave, run_gold, playtime_val, enemies_defeated, player_class, bosses_defeated, elites_defeated, damage_dealt, victory, CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1.0 + player.bonus_gold_xp + player.bonus_xp_only))
+	SaveManager.record_run(wave_director.wave, run_gold, playtime_val, enemies_defeated, player_class, bosses_defeated, elites_defeated, damage_dealt, victory, CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1.0 + player.bonus_gold_xp + player.bonus_xp_only), abilities.levels.size())
 	if victory:
-		SaveManager.complete_phase(map_id, phase_number, difficulty_tier)
+		SaveManager.complete_phase(map_id, phase_number, difficulty_tier, player_class)
 	GameManager.finish_run()
 	get_tree().paused = true
 	result_layer = _make_modal()
@@ -1113,6 +1210,7 @@ func _finish_run(victory: bool) -> void:
 	else:
 		_ui_label(content, "VOCÊ FOI DERROTADO", 28, Color("#e98b7d"), HORIZONTAL_ALIGNMENT_CENTER)
 		_ui_label(content, "Sua jornada continua. A experiência conquistada fica com você.", 14, Color("#c7d1c9"), HORIZONTAL_ALIGNMENT_CENTER)
+		if not run_items.is_empty(): _add_run_rewards(content, run_items)
 		_ui_label(content, _summary_text(), 13, Color("#bac9c2"), HORIZONTAL_ALIGNMENT_CENTER)
 		_ui_button(content, "TENTAR NOVAMENTE", _restart, true)
 	var current_level := TalentManager.character_level(player_class)

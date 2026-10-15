@@ -10,12 +10,14 @@ const PORTRAITS := {
 const ANIMATOR := preload("res://scripts/world/character_animator.gd")
 var animation_time := 0.0
 var class_id := "warrior"
+var weapon_id := ""
+static func texture_for(owner: String, face: bool = false) -> Texture2D:
+	return ANIMATOR.SHEET.atlas(owner, "face" if face else "portrait") if ANIMATOR.SHEET.has_class(owner) else PORTRAITS.get(owner, PORTRAITS.warrior)
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
-func _process(delta: float) -> void:
-	animation_time += delta
-	queue_redraw()
+	texture_filter = TEXTURE_FILTER_NEAREST
+	set_process(false)
 func _draw() -> void:
-	var portrait: Texture2D = PORTRAITS.get(class_id, PORTRAITS.warrior)
+	var portrait: Texture2D = texture_for(class_id)
 	var extent := portrait.get_size() * minf(size.x / portrait.get_width(), size.y / portrait.get_height())
-	ANIMATOR.draw_character(self, class_id, {"time": animation_time}, Color.WHITE, extent, (size - extent) * 0.5)
+	draw_texture_rect(portrait, Rect2((size - extent) * 0.5, extent), false)

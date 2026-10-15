@@ -66,7 +66,9 @@ func _test_rules(save: Node) -> void:
 	assert(not TransmutationRules.validate(save.data, [inputs[0], inputs[0], inputs[0], inputs[0]], "warrior").is_empty())
 	assert(not TransmutationRules.validate(save.data, inputs, "assassin").is_empty())
 	save.data.class_loadouts.mage = {"ring": inputs[0]}
-	assert(not TransmutationRules.validate(save.data, inputs, "warrior").is_empty(), "Other classes' equipped items are protected")
+	assert(TransmutationRules.validate(save.data, inputs, "warrior").is_empty(), "Independent copies belonging to other characters cannot protect this character's stock")
+	save.data.class_loadouts.warrior.ring = inputs[0]
+	assert(not TransmutationRules.validate(save.data, inputs, "warrior").is_empty(), "This character's equipped items remain protected")
 	save.data = before.duplicate(true)
 	assert(not TransmutationRules.validate(save.data, ["field_blade", inputs[1], inputs[2], inputs[3]], "warrior").is_empty())
 	assert(not TransmutationRules.validate(save.data, ["missing", inputs[1], inputs[2], inputs[3]], "warrior").is_empty())
@@ -180,6 +182,9 @@ func _settle(tree: SceneTree) -> void:
 	for frame in 12: await tree.process_frame
 
 func _test_ui(tree: SceneTree, save: Node) -> void:
+	var old_size: Vector2i = tree.root.size
+	var old_scale: Vector2i = tree.root.content_scale_size
+	tree.root.size = Vector2i(1280, 720)
 	var inputs := _fixture(save)
 	for id in inputs: save.data.equipment_quantities[id] = 4
 	save.save_game()
@@ -191,6 +196,8 @@ func _test_ui(tree: SceneTree, save: Node) -> void:
 	await _settle(tree)
 	assert(main.page_name == "transmutation" and main.page_scroll == null)
 	var panel: Node = main.page_root.find_child("TransmutationPanel", true, false)
+	var auto: Control = panel.find_child("FusionAutoSelect", true, false)
+	assert(absf(auto.get_global_rect().end.y - (panel.inputs_frame.get_global_rect().end.y - panel.inputs_frame.get_theme_stylebox("panel").content_margin_bottom)) <= 2, "Auto-selection footer: button %s frame %s column %s" % [auto.get_global_rect(), panel.inputs_frame.get_global_rect(), auto.get_parent().get_global_rect()])
 	panel._auto_select()
 	assert(panel.selected.size() == 4 and not panel.fuse.disabled)
 	panel._begin_fusion()
@@ -249,9 +256,7 @@ func _test_ui(tree: SceneTree, save: Node) -> void:
 	panel._render()
 	await _settle(tree)
 	assert(panel.empty_label.visible and panel.empty_label.get_parent() != panel.item_grid)
-	var old_size: Vector2i = tree.root.size
-	var old_scale: Vector2i = tree.root.content_scale_size
-	for resolution in [Vector2i(1280, 720), Vector2i(960, 540), Vector2i(640, 360), Vector2i(390, 844), Vector2i(360, 640)]:
+	for resolution in [Vector2i(1280, 720), Vector2i(1024, 578), Vector2i(960, 540), Vector2i(640, 360), Vector2i(390, 844), Vector2i(360, 640)]:
 		for scale in [0.85, 1.2]:
 			tree.root.size = resolution
 			tree.root.content_scale_size = resolution
@@ -266,7 +271,14 @@ func _test_ui(tree: SceneTree, save: Node) -> void:
 					assert(not scroll.is_visible_in_tree(), "Only hidden dropdown internals may use a ScrollContainer")
 				var viewport: Control = main.page_root.find_child("OnlineViewport", true, false)
 				assert(viewport.content.get_global_rect().end.y <= viewport.get_global_rect().end.y + 2)
+				if tab in [0, 1]:
+					assert(viewport.content.scale.x >= 0.85, "Ritual readability %s tab %s scale %s: %s" % [resolution, tab, scale, viewport.content.scale])
 				if tab == 1:
+					assert(panel.find_child("EquipmentWagerPanel", true, false) != null)
+					assert(panel.find_children("GuaranteedReward*", "PanelContainer", true, false).is_empty())
+				if tab == 0:
+					if panel.milestones_toggle.visible: panel.milestones_toggle.pressed.emit()
+					await _settle(tree)
 					var rewards := panel.find_children("GuaranteedReward*", "PanelContainer", true, false)
 					assert(rewards.size() == 6, "All six guaranteed milestones must be shown together")
 					var bottom := 0.0
@@ -274,8 +286,10 @@ func _test_ui(tree: SceneTree, save: Node) -> void:
 						assert(reward.get_global_rect().position.y >= bottom)
 						bottom = reward.get_global_rect().end.y
 						var title: Label = reward.find_child("MilestoneTitle", true, false)
-						assert(title.get_theme_font_size("font_size") == roundi(16 * scale))
-					assert(is_equal_approx(viewport.content.scale.x, 1.0), "Milestones must preserve fonts: resolution=%s scale=%s factor=%s extent=%s available=%s" % [resolution, scale, viewport.content.scale, viewport.content.get_combined_minimum_size(), viewport.size])
+						assert(title.get_theme_font_size("font_size") == roundi((11 if panel.compact else 12) * scale))
+					if panel.milestones_toggle.visible:
+						panel.milestones_toggle.pressed.emit()
+						await _settle(tree)
 				for button in panel.find_children("*", "Button", true, false):
 					if not button.is_visible_in_tree(): continue
 					assert(button.get_global_rect().position.x >= viewport.get_global_rect().position.x - 2)
@@ -299,4 +313,4 @@ func _test_ui(tree: SceneTree, save: Node) -> void:
 	await tree.process_frame
 	tree.root.size = old_size
 	tree.root.content_scale_size = old_scale
-	print("PASS: Arsenal entry/back, real fusion, duplicate-click guard, reveal animation/reopen, result popup without changing screens, Legendary text, seven-tier exchange, all six stacked milestones and four tabs at five resolutions/two text scales")
+	print("PASS: Arsenal entry/back, real fusion, duplicate-click guard, reveal animation/reopen, same-screen popup, Legendary text, seven-tier exchange, six milestones moved into Fusion and Wager tab at six resolutions/two text scales")

@@ -14,7 +14,7 @@ static func resolve(save: Dictionary, id: String, amount: int, owner: String) ->
 	if not save.unlocked_classes.has(owner) or (item.class_id != &"" and str(item.class_id) != owner):
 		return {"ok": false, "reason": "O item não pertence à classe selecionada."}
 	if TransmutationRules.protected_ids(save).has(id):
-		return {"ok": false, "reason": "Equipamentos em uso e armas iniciais estão protegidos."}
+		return {"ok": false, "reason": "Favoritos, equipamentos em uso e armas iniciais estão protegidos."}
 	if bool(save.transmutation.last_result.get("pending", false)):
 		return {"ok": false, "reason": "Confira o resultado da fusão antes de trocar seus itens."}
 	var price := quote(item)

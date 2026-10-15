@@ -13,6 +13,7 @@ var margin: MarginContainer
 var header_margin: MarginContainer
 var reward_label: Label
 var stack: VBoxContainer
+var header_rule: Control
 
 func _ready() -> void:
 	name = "AbilityChoiceScreen"
@@ -41,7 +42,8 @@ func _ready() -> void:
 	var hint := "Evolua seu trio ou escolha um passivo." if powers >= 3 else "Escolha até 3 poderes; passivos livres."
 	subtitle = _label("PODERES %d/3 · %s%s" % [powers, hint, " Grupo em pausa." if online else ""], 12, ART.MUTED)
 	header.add_child(subtitle)
-	header.add_child(ChoiceRule.new())
+	header_rule = ChoiceRule.new()
+	header.add_child(header_rule)
 	if not reward_text.is_empty():
 		reward_label = _label(reward_text, 14, ART.GOLD)
 		header.add_child(reward_label)
@@ -76,9 +78,14 @@ func _adapt() -> void:
 		return
 	grid.columns = 3 if size.x >= 760 else 1
 	var compact := size.y < 550
+	var short_window := size.y < 420
 	var narrow := size.x < 520
 	var wide := size.x >= 1100 and size.y >= 650
-	stack.add_theme_constant_override("separation", 24 if wide else 8)
+	stack.add_theme_constant_override("separation", 24 if wide else (4 if short_window else 8))
+	var header := header_margin.get_child(0) as VBoxContainer
+	header.add_theme_constant_override("separation", 2 if short_window else 6)
+	subtitle.visible = not short_window
+	header_rule.visible = not short_window
 	grid.size_flags_vertical = SIZE_SHRINK_BEGIN if wide else SIZE_EXPAND_FILL
 	grid.custom_minimum_size.y = floorf(size.y * 0.65) if wide else 0
 	title.add_theme_font_size_override("font_size", 18 if compact else (20 if narrow else (36 if wide else 24)))

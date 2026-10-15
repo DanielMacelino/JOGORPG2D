@@ -3,6 +3,7 @@ class_name ChaserEnemy
 const AREA_CASTERS := ["mage", "dark_mage", "crypt_wisp", "fire_witch", "blood_mage", "frost_shaman", "spore_shaman"]
 signal spell_requested(position: Vector2, radius: float, damage: float, target: SurvivorPlayer)
 const ART := preload("res://scripts/ui/enemy_portrait.gd")
+const PIXELS := preload("res://scripts/data/pixel_enemy_sprites.gd")
 
 signal defeated(enemy: ChaserEnemy)
 signal damage_received(amount: float)
@@ -48,6 +49,10 @@ func configure(enemy_data: EnemyData, target: SurvivorPlayer, current_wave: int,
 	collision_mask = 0
 	data = enemy_data
 	kind = data.id
+	if PIXELS.has_kind(kind) and get_node_or_null("PixelSprite") == null:
+		var sprite := preload("res://scripts/world/pixel_enemy_sprite.gd").new()
+		sprite.name = "PixelSprite"
+		add_child(sprite)
 	player = target
 	wave_scale = 1.0 + float(maxi(0, current_wave - 1)) * 0.12
 	max_health = data.max_health * wave_scale * stage_difficulty * 1.15
@@ -96,6 +101,7 @@ func _physics_process(delta: float) -> void:
 	var to_player := player.global_position - global_position
 	var distance := to_player.length()
 	var direction := to_player.normalized() if distance > 0.01 else Vector2.ZERO
+	if attack_time <= 0.0: attack_direction = direction
 	var ranged := data.attack_style == &"ranged"
 	var target_distance := attack_range
 	if ranged:
@@ -213,6 +219,19 @@ func _show_damage(amount: float, critical: bool) -> void:
 	popup.add_to_group("damage_popup")
 
 func _draw() -> void:
+	var pixel_sprite := get_node_or_null("PixelSprite")
+	if pixel_sprite != null:
+		pixel_sprite.pose(kind, animation_time, moving_blend, attack_time, attack_direction, hit_flash, spawn_time)
+		var radius := 35.0 if data.boss else (22.0 if data.elite else 17.0)
+		draw_arc(Vector2(0, 4), radius, 0, TAU, 32, Color("#f5ba78", 0.6), 1.2, true)
+		if data.elite or data.boss:
+			var top := -94.0 if data.boss else -60.0
+			if data.boss and PIXELS.has_kind(kind):
+				top = minf(top, -PIXELS.foot_for(str(kind), "idle", 0).y * float(PIXELS.LAYOUTS[str(kind)].scale) - 12.0)
+			var bar := Rect2(-radius, top, radius * 2, 4)
+			draw_rect(bar.grow(1), Color("#071914"))
+			draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(health / maxf(1, max_health), 0, 1), bar.size.y)), Color("#efaf79"))
+		return
 	var bob := sin(animation_time * (11.0 if moving_blend > 0.1 else 2.7)) * (1.5 * moving_blend + 0.45)
 	var sway := sin(animation_time * 7.0) * 0.025 * moving_blend
 	var strike := sin((1.0 - attack_time / 0.24) * PI) if attack_time > 0.0 else 0.0

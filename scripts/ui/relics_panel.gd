@@ -104,7 +104,7 @@ func _build_header() -> void:
 	title.name = "RelicsTitle"
 	_single_line(title)
 	titles.add_child(title)
-	var subtitle := _label("Modificadores poderosos que alteram as regras de cada expedição.", 13, ART.TEXT)
+	var subtitle := _label("%s · descobertas e equipamentos individuais." % ContentCatalog.classes[str(SaveManager.data.selected_class)].display_name, 13, ART.TEXT)
 	subtitle.visible = not compact
 	titles.add_child(subtitle)
 	if not compact: add_child(RECORDS.Rule.new())
@@ -233,7 +233,7 @@ func _refresh_cards() -> void:
 		title.tooltip_text = str(data.name) if owned else "Complete a conquista para revelar esta relíquia."
 		heading.add_child(title)
 		if owned and not compact and not narrow: heading.add_child(_badge(str(data.rarity), color))
-		var description := _label(str(data.desc) if owned else "Desbloqueie completando conquistas e derrotando chefes.", 11 if compact else 12, ART.TEXT if owned else ART.MUTED)
+		var description := _label(str(data.desc) if owned else "Desbloqueie cumprindo desafios com este personagem.", 11 if compact else 12, ART.TEXT if owned else ART.MUTED)
 		description.max_lines_visible = 2
 		description.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		info.add_child(description)
@@ -297,8 +297,7 @@ func _refresh_detail() -> void:
 	condition.name = "RelicUnlockCondition"
 	detail_column.add_child(condition)
 	if not owned:
-		var achievement: Dictionary = ContentCatalog.get_achievement(str(data.get("unlock", "")))
-		detail_column.add_child(_label(str(achievement.get("desc", "Complete conquistas durante as expedições.")), 12, ART.MUTED))
+		detail_column.add_child(_label("O progresso deste desafio pertence apenas ao personagem selecionado.", 12, ART.MUTED))
 	elif not compact:
 		detail_column.add_child(RECORDS.Rule.new())
 		detail_column.add_child(_label("EFEITOS", 12, ART.GOLD, true))
@@ -359,8 +358,7 @@ func _store() -> void:
 	draft.section = section_index
 
 func _condition(data: Dictionary) -> String:
-	var achievement: Dictionary = ContentCatalog.get_achievement(str(data.get("unlock", "")))
-	return "Conquista: " + str(achievement.get("title", "Exploração")).capitalize()
+	return str(SaveManager.CHARACTER_META.RELIC_REQUIREMENTS.get(str(data.get("unlock", "")), "Explore com este personagem."))
 
 func _color(data: Dictionary) -> Color:
 	return ART.RARITY_COLORS.get(str(data.get("rarity", "common")), ART.GOLD)

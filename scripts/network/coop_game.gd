@@ -16,7 +16,7 @@ var level_rewards := 0
 var started := false
 var kill_kinds: Dictionary = {}
 var replica: Node2D
-var team_label: Label
+var team_label: Control
 var choice_ids: Array = []
 var choice_ranks: Dictionary = {}
 var ability_uses: Dictionary = {}
@@ -66,6 +66,7 @@ func begin_coop() -> void:
 	if started:
 		return
 	started = true
+	AudioManager.match_music(true)
 	if NetworkSession.hosting:
 		wave_director.start()
 		phase_director.set_process(true)
@@ -75,13 +76,8 @@ func begin_coop() -> void:
 	_show_notice("EXPEDIÇÃO COOPERATIVA · PROTEJAM O GRUPO")
 
 func _build_team_label() -> void:
-	team_label = _ui_label(ui_root, "Aguardando os viajantes…", 12, MINT)
-	team_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	team_label.offset_left = 18
-	team_label.offset_top = -115
-	team_label.offset_right = 290
-	team_label.offset_bottom = -30
-	team_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	team_label = preload("res://scripts/ui/party_hud.gd").new()
+	ui_root.add_child(team_label)
 
 func _process(delta: float) -> void:
 	if not started or run_finished:
@@ -124,15 +120,18 @@ func _update_revives(delta: float) -> void:
 				nearest = distance
 				helper = candidate
 		if helper == null:
-			fallen.revive_progress = 0.0
 			revive_helpers.erase(id)
 		else:
 			var state: Array = revive_helpers.get(id, [])
-			if state.is_empty() or state[0] != helper.get_instance_id() or state[1] != helper.damage_serial:
-				fallen.revive_progress = 0.0
-				revive_helpers[id] = [helper.get_instance_id(), helper.damage_serial]
-			else:
+			if state.is_empty() or state[0] != helper.get_instance_id():
+				state = [helper.get_instance_id(), helper.damage_serial, 0.0]
+			if state[1] != helper.damage_serial:
+				state[1] = helper.damage_serial
+				state[2] = 0.8
+			elif float(state[2]) <= 0.0:
 				fallen.revive_progress = minf(1.0, fallen.revive_progress + delta / REVIVE_SECONDS)
+			state[2] = maxf(0.0, float(state[2]) - delta)
+			revive_helpers[id] = state
 			if fallen.revive_progress >= 1.0:
 				fallen.revive()
 				_spawn_skill(fallen.global_position, "summon", 65.0, Color("#8dffce"))
@@ -141,17 +140,26 @@ func _update_revives(delta: float) -> void:
 		fallen.queue_redraw()
 
 func _refresh_team() -> void:
-	var lines: PackedStringArray = []
+	var members: Array[Dictionary] = []
 	for id in actors:
 		var unit: SurvivorPlayer = actors[id].player
-		lines.append("%s · %s" % [NetworkSession.players[id].name, unit.downed_status() if unit.is_dead else "%d/%d HP" % [unit.health, unit.max_health]])
-	team_label.text = "\n".join(lines)
+		members.append({"name": NetworkSession.players.get(id, {}).get("name", "Viajante"), "class_id": str(unit.class_data.id), "health": unit.health, "maximum": unit.max_health, "dead": unit.is_dead, "revive": unit.revive_progress})
+	team_label.update_members(members)
 
 func _record_kill(_kind: String) -> void:
 	pass # Each participant banks the final shared kill ledger in their own save.
 
 func _record_ability_use(id: String) -> void:
 	ability_uses[id] = int(ability_uses.get(id, 0)) + 1
+
+func _award_mimic_loot(at: Vector2) -> void:
+	if mimic_loot_awarded or not NetworkSession.hosting: return
+	var rewards := {}
+	for id in actors:
+		var actor: Node = actors[id]
+		var drop := loot.roll_boss_reward(map_id, actor.player_class, phase_number, NetworkSession.players[id].owned, difficulty_tier)
+		rewards[id] = str(drop.equipment)
+	NetworkSession.award_mimic_items(rewards, at)
 
 func _on_enemy_died(enemy: ChaserEnemy) -> void:
 	if run_finished:
@@ -331,10 +339,11 @@ func _finish_run(victory: bool, party_defeated: bool = false) -> void:
 		var drop := loot.roll_boss_reward(map_id, actor.player_class, phase_number, NetworkSession.players[id].owned, difficulty_tier) if victory else {}
 		if victory:
 			drop.gold = roundi(int(drop.gold) * CampaignRules.reward_multiplier(difficulty_tier, phase_number))
-		results[id] = {"class": actor.player_class, "victory": victory, "reward": drop, "gold": actor.run_gold, "wave": wave_director.wave, "time": wave_director.match_time, "kills": enemies_defeated, "bosses": bosses_defeated, "elites": elites_defeated, "damage": actor.player.total_damage_dealt, "level_rewards": actor.level_rewards, "multiplier": CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1 + actor.player.bonus_gold_xp + actor.player.bonus_xp_only), "kinds": kill_kinds, "uses": actor.ability_uses}
+		results[id] = {"class": actor.player_class, "victory": victory, "reward": drop, "gold": actor.run_gold, "wave": wave_director.wave, "time": wave_director.match_time, "kills": enemies_defeated, "bosses": bosses_defeated, "elites": elites_defeated, "damage": actor.player.total_damage_dealt, "level_rewards": actor.level_rewards, "multiplier": CampaignRules.reward_multiplier(difficulty_tier, phase_number) * (1 + actor.player.bonus_gold_xp + actor.player.bonus_xp_only), "kinds": kill_kinds, "uses": actor.ability_uses, "skill_count": actor.abilities.levels.size()}
 	NetworkSession.finish(results)
 
 func show_coop_result(result: Dictionary, banked_gold: int) -> void:
+	_close_pause_settings()
 	get_tree().paused = false
 	collective_paused = false
 	run_finished = true
@@ -349,6 +358,7 @@ func show_coop_result(result: Dictionary, banked_gold: int) -> void:
 		pause_layer = null
 	GameManager.finish_run()
 	_set_boss_music(false)
+	AudioManager.match_music(false)
 	result_layer = _make_modal()
 	var panel := _result_panel(result_layer, 720.0)
 	var content := VBoxContainer.new()
@@ -358,7 +368,7 @@ func show_coop_result(result: Dictionary, banked_gold: int) -> void:
 	_ui_label(content, "%d abates · Onda %d · %s\n+%d ouro · +%d XP para %s" % [result.kills, result.wave, _format_time(float(result.time)), banked_gold, SaveManager.data.class_progression[player_class].last_xp, player.class_data.display_name], 14, MINT)
 	if result.victory:
 		_ui_label(content, "+%d cristais do chefe" % int(result.reward.get("crystals", 0)), 14, GOLD)
-		_add_run_rewards(content, result.get("items", []))
+	if not result.get("items", []).is_empty(): _add_run_rewards(content, result.get("items", []))
 	_ui_label(content, "Seu progresso foi salvo neste computador.", 12, MINT)
 	if NetworkSession.hosting:
 		_ui_button(content, "VOLTAR À SALA COM O GRUPO", NetworkSession.return_lobby, true)
@@ -376,11 +386,17 @@ func remove_peer(id: int) -> void:
 	check_party()
 
 func _toggle_pause() -> void:
+	if _close_pause_settings(): return
 	if run_finished:
 		return
 	if pause_layer != null:
 		pause_layer.queue_free()
 		pause_layer = null
+		if hud_layout_dirty:
+			hud_layout_dirty = false
+			_build_hud()
+			_build_team_label()
+			_update_hud()
 		return
 	pause_layer = _make_modal()
 	var panel := _modal_panel(pause_layer, Vector2(440, 0))
@@ -389,6 +405,7 @@ func _toggle_pause() -> void:
 	_ui_label(content, "EXPEDIÇÃO ONLINE", 23, GOLD)
 	_ui_label(content, "O grupo continua jogando. A partida não pausa.", 13, MINT)
 	_ui_button(content, "CONTINUAR", _toggle_pause, true)
+	_ui_button(content, "CONFIGURAÇÕES", _open_pause_settings, false).name = "OpenPauseSettings"
 	_ui_button(content, "SAIR DA SALA", func() -> void: NetworkSession.close("Você saiu da sala."))
 
 func _on_viewport_resized() -> void:

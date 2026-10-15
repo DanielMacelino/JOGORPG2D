@@ -12,7 +12,7 @@ func run(tree: SceneTree) -> void:
 		assert(not item.description.is_empty() and item.stat_amount > 0)
 		if not families.has(str(item.family_id)): families[str(item.family_id)] = []
 		families[str(item.family_id)].append(item)
-	assert(generated == 6048 and families.size() == 864)
+	assert(generated == 6188 and families.size() == 884)
 	var recipes := 0
 	for recipe in catalog.forge_recipes:
 		if not bool(recipe.get("generated", false)): continue
@@ -21,7 +21,7 @@ func run(tree: SceneTree) -> void:
 		var source: EquipmentData = catalog.equipment[recipe.ingredients[0].id]
 		assert(source.family_id == item.family_id and source.class_id == item.class_id and source.slot == item.slot and source.tier_index + 1 == item.tier_index)
 		assert(catalog.get_forge_recipe(str(recipe.id)) == recipe)
-	assert(recipes == 5184)
+	assert(recipes == 5304)
 	for family in families.values():
 		family.sort_custom(func(a: EquipmentData,b: EquipmentData) -> bool: return a.tier_index < b.tier_index)
 		assert(family.size() == 7)
@@ -105,4 +105,4 @@ func run(tree: SceneTree) -> void:
 	assert(panel.matched_recipes.is_empty(), "Divine crafts stay unavailable before campaign progression")
 	main.queue_free()
 	await tree.process_frame
-	print("PASS: 6048 class equipment, 864 seven-tier families, 5184 indexed upgrade recipes, 294 functional class/shared skills, difficulty gates, regional drops and equipped crafting persistence")
+	print("PASS: 6188 class equipment, 884 seven-tier families, 5304 indexed upgrade recipes, 294 functional class/shared skills, difficulty gates, regional drops and equipped crafting persistence")

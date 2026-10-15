@@ -117,13 +117,13 @@ func _test_drops() -> void:
 				assert(item.region_id == region and (item.class_id == &"" or item.class_id == owner))
 				assert(not found.has(str(item.id)), "Prefer undiscovered regional drops")
 				found.append(str(item.id))
-				save.unlock_equipment(str(item.id))
+				save.unlock_equipment(str(item.id), str(owner))
 			assert(loot.roll_boss_reward(str(region), str(owner), 10).crystals == 2)
 	loot.free()
 	print("PASS: 60 regional items, six regions x six class drop pools, discoveries and final-stage crystals")
 
 func _equip(id: String, owner: String) -> void:
-	save.unlock_equipment(id)
+	save.unlock_equipment(id, owner)
 	var item: EquipmentData = catalog.equipment[id]
 	assert(tree.root.get_node("EquipmentManager").equip(str(item.slot), id, owner))
 
@@ -170,7 +170,7 @@ func _test_equipment_effects() -> void:
 	game._process(0.01)
 	assert(tree.get_nodes_in_group("forest_companion").size() == 2)
 	for companion in tree.get_nodes_in_group("forest_companion"):
-		assert(is_equal_approx(companion.remaining, 21.0))
+		assert(companion.kind == "rootling" and is_equal_approx(companion.remaining, 23.0))
 	await _dispose(game)
 	print("PASS: equipped ricochet, burn, slow, duration and summon damage; effects persist with class loadouts")
 
@@ -273,9 +273,10 @@ func _test_home() -> void:
 			assert(main.page_root.get_combined_minimum_size().x <= tree.root.get_visible_rect().size.x + 1, "Home must fit the window")
 			assert(home.find_child("HomePlay", true, false).size.x <= home.size.x)
 			var play: Button = home.find_child("HomePlay", true, false)
-			var prepare: Button = home.find_child("HomePrepare", true, false)
-			assert(absf(play.position.x - prepare.position.x) <= 1 and absf(play.size.x - prepare.size.x) <= 1, "Main actions must share alignment and width")
-			var gap := prepare.position.y - play.position.y - play.size.y
+			assert(home.find_child("HomePrepare", true, false) == null, "Character preparation belongs to the main Character tile")
+			var utilities: Control = home.find_child("HomeUtilities", true, false)
+			assert(absf(play.position.x - utilities.position.x) <= 1 and absf(play.size.x - utilities.size.x) <= 1, "Main actions must share alignment and width")
+			var gap := utilities.position.y - play.position.y - play.size.y
 			assert(gap >= 6 and gap <= 10, "Main actions must stay together")
 			var settings: Button = home.find_child("HomeSettings", true, false)
 			var online: Button = home.find_child("HomeOnline", true, false)

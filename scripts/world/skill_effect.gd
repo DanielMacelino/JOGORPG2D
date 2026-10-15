@@ -1,29 +1,64 @@
 extends Node2D
-## Cosmetic only: geometry never deals damage or changes an ability's range.
+## Replicated visuals. The host alone connects bloom pulses to authoritative damage.
+signal expansion_pulse(reach: float)
+const BLOOM := preload("res://assets/art/abilities/hab01.png")
 var kind := "arcane"
 var radius := 110.0
 var color := Color("#abebff")
 var direction := Vector2.RIGHT
 var elapsed := 0.0
 var lifetime := 0.65
+var bloom_sprite: Sprite2D
+
+func bloom_reach() -> float:
+	return radius * clampf(elapsed / maxf(0.001, lifetime * 0.65), 0.0, 1.0)
 
 func _ready() -> void:
 	z_index = 6
 	add_to_group("skill_effect")
+	bloom_sprite = get_node_or_null("BloomSprite") as Sprite2D
+	if bloom_sprite == null:
+		bloom_sprite = Sprite2D.new()
+		bloom_sprite.name = "BloomSprite"
+		add_child(bloom_sprite)
+	bloom_sprite.texture = BLOOM
+	bloom_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bloom_sprite.region_enabled = true
+	bloom_sprite.region_filter_clip_enabled = true
+	bloom_sprite.visible = kind == "arcane_bloom"
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if kind == "arcane_bloom": expansion_pulse.emit(bloom_reach())
 	queue_redraw()
 	if elapsed >= lifetime:
 		queue_free()
 
 func _draw() -> void:
 	var progress := clampf(elapsed / maxf(0.001, lifetime), 0.0, 1.0)
+	if is_instance_valid(bloom_sprite):
+		bloom_sprite.visible = kind == "arcane_bloom"
+		if bloom_sprite.visible:
+			# The source has a 64px frame row and a footer: never include the footer.
+			bloom_sprite.region_rect = Rect2(mini(15, floori(progress * 16)) * 64, 0, 64, 64)
+			bloom_sprite.scale = Vector2.ONE * radius * 2.2 / 64.0 * (0.35 + 0.65 * clampf(progress / 0.65, 0, 1))
+			bloom_sprite.self_modulate.a = clampf((1.0 - progress) / 0.2, 0, 1)
+			return
 	var alpha := sin(progress * PI) * 0.85
+	if alpha <= 0.0001: return
 	var reach := radius * (0.20 + progress * 0.80)
 	var ink := Color(color, alpha)
 	var bright := Color(color.lightened(0.55), alpha)
 	match kind:
+		"arrow_rain":
+			for index in 16:
+				var angle := float(index) * 2.39996
+				var point := Vector2.from_angle(angle) * radius * sqrt(float(index + 1) / 16.0)
+				var drop := fmod(progress * 2.2 + index * 0.11, 1.0)
+				var tip := point + Vector2(0, -65.0 * (1.0 - drop))
+				draw_line(tip + Vector2(5, -27), tip, bright, 1.5, true)
+				draw_polyline(PackedVector2Array([tip + Vector2(-3, -6), tip, tip + Vector2(5, -4)]), ink, 1.4, true)
+			draw_arc(Vector2.ZERO, radius, 0, TAU, 48, Color(color, alpha * 0.35), 1, true)
 		"frost":
 			draw_arc(Vector2.ZERO, reach, 0, TAU, 48, ink, 2.0, true)
 			for index in 10:
@@ -37,7 +72,7 @@ func _draw() -> void:
 			for index in 12:
 				var angle := index * TAU / 12.0 + progress * 0.18
 				var center := Vector2.from_angle(angle) * reach
-				var flame := PackedVector2Array([center + Vector2(-5, 3), center + Vector2(-3, -6), center + Vector2(sin(index + progress * 12) * 5, -18 * (1.0 - progress) - 6), center + Vector2(6, 1)])
+				var flame := PackedVector2Array([center + Vector2(-5, 3), center + Vector2(-3, -6), center + Vector2(sin(index + progress * 12) * 2, -18 * (1.0 - progress) - 6), center + Vector2(6, 1)])
 				draw_colored_polygon(flame, ink)
 				draw_line(Vector2.from_angle(angle) * reach * 0.65, center, bright, 1.2, true)
 			if kind == "holy":

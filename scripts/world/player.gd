@@ -72,11 +72,15 @@ var attack_serial := 0
 var attack_direction := Vector2.RIGHT
 var attack_critical := false
 var attack_animation_style: StringName = &"melee"
+var attack_special := false
+var death_elapsed := 0.0
+var character_sprite: Sprite2D
 
 func _ready() -> void:
 	add_to_group("survivor_player")
 
 func configure(class_id: String, permanent_equipment: Dictionary) -> void:
+	equipped_weapon_id = str(SaveManager.loadout_for(class_id).get("weapon", ""))
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	collision_layer = 1
 	collision_mask = 4
@@ -84,8 +88,7 @@ func configure(class_id: String, permanent_equipment: Dictionary) -> void:
 	class_data = ContentCatalog.classes.get(class_id, ContentCatalog.classes.get("warrior"))
 	crit_chance = 0.05
 	crit_multiplier = 1.7
-	var save: Dictionary = SaveManager.data
-	var upgrades: Dictionary = save.get("upgrades", {})
+	var upgrades: Dictionary = SaveManager.upgrades_for(class_id)
 	var equipment_bonuses: Dictionary = EquipmentManager.equipped_bonuses(class_id)
 	max_health = class_data.max_health
 	damage = class_data.damage
@@ -142,6 +145,12 @@ func configure(class_id: String, permanent_equipment: Dictionary) -> void:
 	life_recovery_budget = max_health * 0.01
 	tint = class_data.accent
 	is_dead = false
+	death_elapsed = 0.0
+	attack_special = false
+	if ANIMATOR.SHEET.has_class(player_class) and not is_instance_valid(character_sprite):
+		character_sprite = preload("res://scenes/characters/sheet_character.tscn").instantiate()
+		add_child(character_sprite)
+	if is_instance_valid(character_sprite): character_sprite.pose(player_class, animation_state(), Color.WHITE)
 	base_run_stats = {"max_health": max_health, "damage": damage, "defense": defense, "move_speed": move_speed, "attack_cooldown": attack_cooldown, "attack_range": attack_range, "crit_chance": crit_chance, "bonus_gold_xp": bonus_gold_xp, "pickup_radius": pickup_radius, "lifesteal": lifesteal, "regen": regen, "cleave_targets": cleave_targets, "projectile_pierce": projectile_pierce, "splash_bonus": splash_bonus}
 	base_run_stats.merge({"thorns": thorns, "summon_duration": summon_duration, "summon_damage_pct": summon_damage_pct})
 	queue_redraw()
@@ -174,6 +183,8 @@ func _physics_process(delta: float) -> void:
 	if NetworkSession.running and NetworkSession.hosting and net_peer_id != 1:
 		NetworkSession.simulate_remote_player(self)
 	if is_dead:
+		death_elapsed += delta
+		queue_redraw()
 		return
 	animation_time += delta
 	# Area hits share a recovery budget, so attacking a crowd cannot heal a full bar instantly.
@@ -221,10 +232,11 @@ func _clamp_to_arena() -> void:
 func set_virtual_direction(direction: Vector2) -> void:
 	external_direction = direction
 
-func play_attack(direction: Vector2, critical: bool = false, style: StringName = &"melee") -> void:
+func play_attack(direction: Vector2, critical: bool = false, style: StringName = &"melee", special: bool = false) -> void:
 	attack_direction = direction.normalized() if not direction.is_zero_approx() else facing
 	attack_critical = critical
 	attack_animation_style = style
+	attack_special = special
 	attack_serial += 1
 	attack_duration = {"warrior": 0.30, "mage": 0.34, "ranger": 0.17, "assassin": 0.15, "druid": 0.34, "paladin": 0.30}.get(player_class, 0.24)
 	attack_time = attack_duration
@@ -251,6 +263,7 @@ func take_damage(amount: float, area_damage: bool = false, source: Node = null) 
 	var lethal := health <= 0.0
 	if lethal:
 		is_dead = true
+		death_elapsed = 0.0
 	flash = 0.22
 	damaged.emit(actual)
 	stats_changed.emit()
@@ -262,6 +275,7 @@ func revive() -> void:
 	if not is_dead:
 		return
 	is_dead = false
+	death_elapsed = 0.0
 	revive_progress = 0.0
 	health = max_health * 0.35
 	revive_protection = 2.0
@@ -291,10 +305,16 @@ func record_damage(amount: float) -> void:
 		life_recovery_budget -= recovered
 		heal(recovered)
 
+var equipped_weapon_id := ""
+
 func animation_state() -> Dictionary:
-	return {"time": animation_time, "moving": moving_blend, "facing": facing, "attacking": attack_time > 0.0, "attack_progress": 1.0 - attack_time / maxf(0.001, attack_duration), "attack_serial": attack_serial}
+	return {"time": animation_time, "moving": moving_blend, "facing": facing, "attacking": attack_time > 0.0, "attack_progress": 1.0 - attack_time / maxf(0.001, attack_duration), "attack_serial": attack_serial, "weapon_id": equipped_weapon_id, "attack_direction": attack_direction, "special": attack_special, "hurt": flash, "dead": is_dead, "death_elapsed": death_elapsed, "running": class_data != null and move_speed > class_data.speed * 1.05}
 
 func _draw() -> void:
+	if is_instance_valid(character_sprite):
+		var ink := Color(1.6, 1.6, 1.6) if flash > 0 and not is_dead else Color.WHITE
+		if invulnerability > 0 and not is_dead and int(invulnerability * 22.0) % 2 == 0: ink.a = 0.55
+		character_sprite.pose(player_class, animation_state(), ink)
 	if is_dead:
 		draw_circle(Vector2.ZERO, 27, Color("#061018", 0.95))
 		draw_arc(Vector2.ZERO, 27, 0, TAU, 48, Color("#ffcd6a"), 2, true)
@@ -310,7 +330,7 @@ func _draw() -> void:
 	var body_color := Color(1.6, 1.6, 1.6) if flash > 0 else Color.WHITE
 	if invulnerability > 0 and int(invulnerability * 22.0) % 2 == 0:
 		body_color.a = 0.55
-	ANIMATOR.draw_character(self, player_class, animation_state(), body_color)
+	if not ANIMATOR.SHEET.has_class(player_class): ANIMATOR.draw_character(self, player_class, animation_state(), body_color)
 
 	if attack_time > 0.0:
 		var progress := 1.0 - attack_time / maxf(0.001, attack_duration)

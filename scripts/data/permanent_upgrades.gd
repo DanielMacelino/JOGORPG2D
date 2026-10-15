@@ -2,7 +2,7 @@ extends RefCounted
 class_name PermanentUpgrades
 ## Ten purchases in every attribute unlock the next shared mastery tier.
 const STEPS := 10
-const RATES := [0.001, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+const RATES := [0.0002, 0.0003, 0.0005, 0.0007, 0.001, 0.0015, 0.002]
 const NAMES := ["Aprendiz", "Iniciado", "Veterano", "Mestre", "Ascendente", "Semideus", "Divino"]
 const IDS := ["vitality", "might", "fortune", "resilience", "swiftness", "crit_mastery", "xp_boost", "attack_speed"]
 const MAX_RANK := 70
@@ -38,7 +38,30 @@ static func cost(id: String, levels: Dictionary) -> int:
 			base = int(entry.base_cost)
 	var rank := clampi(int(levels.get(id, 0)), 0, MAX_RANK)
 	var stage := mini(RATES.size() - 1, floori(float(rank) / STEPS))
-	return roundi(base * 0.25 * pow(1.9, stage) * (1.0 + (rank % STEPS) * 0.12))
+	return roundi(base * 0.35 * pow(1.9, stage) * (1.0 + (rank % STEPS) * 0.12))
+
+static func legacy_refund(levels: Dictionary) -> int:
+	var refund := 0
+	for id in IDS:
+		var base := 100
+		for entry in ContentCatalog.upgrades:
+			if str(entry.id) == id: base = int(entry.base_cost)
+		for rank in clampi(int(levels.get(id, 0)), 0, MAX_RANK):
+			refund += roundi(base * 0.25 * pow(1.9, mini(6, floori(float(rank) / STEPS))) * (1.0 + (rank % STEPS) * 0.12))
+	return refund
+
+static func max_quote(id: String, levels: Dictionary) -> Dictionary:
+	var quote := {"count": 0, "cost": 0, "target": int(levels.get(id, 0))}
+	if not can_buy(id, levels): return quote
+	# Capture this tier before simulating: completing its last attribute must not buy the next tier.
+	var target := mini(MAX_RANK, (tier(levels) + 1) * STEPS)
+	var simulated := levels.duplicate(true)
+	while int(simulated.get(id, 0)) < target:
+		quote.cost += cost(id, simulated)
+		quote.count += 1
+		simulated[id] = int(simulated.get(id, 0)) + 1
+	quote.target = target
+	return quote
 
 static func progress(levels: Dictionary) -> int:
 	var stage := tier(levels)
@@ -48,4 +71,4 @@ static func progress(levels: Dictionary) -> int:
 	return total
 
 static func percent(value: float) -> String:
-	return ("%.1f" % (value * 100.0)).trim_suffix(".0").replace(".", ",") + "%"
+	return ("%.2f" % (value * 100.0)).trim_suffix("0").trim_suffix("0").trim_suffix(".").replace(".", ",") + "%"

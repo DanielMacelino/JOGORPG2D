@@ -45,10 +45,10 @@ func run(tree: SceneTree) -> void:
 		if button.text.begins_with("APRIMORAR"):
 			upgrade = button
 			break
-	var ranks_before: Dictionary = save.data.upgrades.duplicate()
+	var ranks_before: Dictionary = save.upgrades_for().duplicate()
 	upgrade.pressed.emit()
 	for frame in 10: await tree.process_frame
-	assert(save.data.upgrades != ranks_before)
+	assert(save.upgrades_for() != ranks_before)
 	main._build_page("forge")
 	for frame in 10: await tree.process_frame
 	# Power sorting can put locked endgame recipes first; use the real availability filter.

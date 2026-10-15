@@ -6,9 +6,10 @@ const RECORDS := preload("res://scripts/ui/menu/records_screen.gd")
 const CABINET := preload("res://scripts/ui/relics_panel.gd")
 const ICON := preload("res://scripts/ui/equipment_icon.gd")
 const STATS := preload("res://scripts/data/equipment_expansion.gd")
+const COMPARISON := preload("res://scripts/systems/equipment_comparison.gd")
 const CATEGORIES := [["Todas", "all"], ["Armas", "weapons"], ["Armaduras", "armor"], ["Acessórios", "accessories"]]
 const SLOTS := [["Todos", "all"], ["Armas", "weapon"], ["Elmos", "helmet"], ["Armaduras", "armor"], ["Botas", "boots"], ["Anéis", "ring"], ["Amuletos", "amulet"]]
-const WEAPONS := [["Todas", "all"], ["Espada", "sword"], ["Cajado", "staff"], ["Arco", "bow"], ["Adagas", "daggers"], ["Raízes", "roots"], ["Martelo", "hammer"]]
+const WEAPONS := [["Todas", "all"], ["Espada", "sword"], ["Cajado", "staff"], ["Arco", "bow"], ["Adagas", "daggers"], ["Raízes", "roots"], ["Martelo", "hammer"], ["Lança", "spear"], ["Machado", "axe"], ["Chicote", "whip"], ["Foice", "scythe"]]
 var draft: Dictionary = {}
 var filters: GridContainer
 var class_picker: OptionButton
@@ -18,6 +19,7 @@ var weapon_picker: OptionButton
 var order_picker: OptionButton
 var search: LineEdit
 var possible: CheckBox
+var craftable_button: Button
 var list: VBoxContainer
 var count_label: Label
 var page_label: Label
@@ -112,6 +114,8 @@ func _ready() -> void:
 	possible.button_pressed = bool(draft.possible)
 	possible.tooltip_text = "Receitas com ingredientes, saldo, classe e dificuldade disponíveis."
 	possible.toggled.connect(func(value: bool) -> void: _filter("possible", value))
+	# Retain the filter binding while presenting a prominent action above the recipes.
+	possible.visible = false
 	filters.add_child(possible)
 	subtypes = VBoxContainer.new()
 	subtypes.name = "ForgeSubtypes"
@@ -146,6 +150,16 @@ func _ready() -> void:
 	_set_picker(order_picker, str(draft.order))
 	order_picker.item_selected.connect(func(index: int) -> void: _filter("order", str(order_picker.get_item_metadata(index))))
 	tools.add_child(order_picker)
+	craftable_button = _button("O QUE CONSIGO CRAFTAR", bool(draft.possible), 30 if compact else 34)
+	craftable_button.name = "ForgeCraftable"
+	craftable_button.action_font_size = 11
+	craftable_button.toggle_mode = true
+	craftable_button.button_pressed = bool(draft.possible)
+	craftable_button.tooltip_text = "Mostrar somente as receitas que posso forjar agora. Clique novamente para mostrar todas."
+	craftable_button.toggled.connect(func(value: bool) -> void:
+		possible.set_pressed_no_signal(value)
+		_filter("possible", value))
+	recipes.add_child(craftable_button)
 	count_label = _label("", 10 if compact else 11, ART.GOLD)
 	recipes.add_child(count_label)
 	list = VBoxContainer.new()
@@ -239,6 +253,11 @@ func _set_picker(picker: OptionButton, value: String) -> void:
 func _filter(key: String, value: Variant) -> void:
 	draft[key] = value
 	draft.page = 0
+	draft.compare_page = 0
+	draft.comparing = false
+	if key == "possible":
+		craftable_button.set_pressed_no_signal(bool(value))
+		possible.set_pressed_no_signal(bool(value))
 	if key == "category":
 		draft.slot = "all"
 		draft.weapon = "all"
@@ -252,13 +271,15 @@ func _refresh(keep_selection: bool = false) -> void:
 	for recipe in ContentCatalog.forge_recipes:
 		var item: EquipmentData = ContentCatalog.equipment.get(str(recipe.result))
 		if item == null: continue
+		if SaveManager.is_equipment_favorite(str(item.id)): continue
+		if recipe.get("ingredients", []).any(func(ingredient: Dictionary) -> bool: return SaveManager.is_equipment_favorite(str(ingredient.id))): continue
 		if str(draft.class) != "all" and item.class_id != &"" and str(item.class_id) != str(draft.class): continue
 		if str(draft.slot) != "all" and str(item.slot) != str(draft.slot): continue
 		if str(draft.rarity) != "all" and str(item.rarity) != str(draft.rarity): continue
 		if str(draft.category) == "weapons" and item.slot != &"weapon": continue
 		if str(draft.category) == "armor" and str(item.slot) not in ["helmet", "armor", "boots"]: continue
 		if str(draft.category) == "accessories" and str(item.slot) not in ["ring", "amulet"]: continue
-		if str(draft.weapon) != "all" and (item.slot != &"weapon" or str(ICON.WEAPONS.get(str(item.class_id), "sword")) != str(draft.weapon)): continue
+		if str(draft.weapon) != "all" and (item.slot != &"weapon" or ICON.weapon_type(item) != str(draft.weapon)): continue
 		var haystack := item.display_name + " " + str(item.family_id) + " " + str(item.region_id)
 		if ContentCatalog.maps.has(str(item.region_id)): haystack += " " + str(ContentCatalog.maps[str(item.region_id)].display_name)
 		if not str(draft.query).is_empty() and not haystack.to_lower().contains(str(draft.query).strip_edges().to_lower()): continue
@@ -299,6 +320,8 @@ func _refresh_header() -> void:
 		var button: Button = categories.get_child(index)
 		ART.apply_button(button, str(CATEGORIES[index][1]) == str(draft.category), button.get_theme_font("font"))
 		button.add_theme_font_size_override("font_size", 11 if compact else 12)
+	ART.apply_button(craftable_button, bool(draft.possible), craftable_button.get_theme_font("font"))
+	craftable_button.add_theme_font_size_override("font_size", 11)
 
 func _refresh_subtypes() -> void:
 	_clear(subtypes)
@@ -397,6 +420,8 @@ func _card(recipe: Dictionary) -> void:
 func _select_recipe(id: String, show_details: bool = false) -> void:
 	if ContentCatalog.get_forge_recipe(id).is_empty(): return
 	draft.selected = id
+	draft.comparing = show_details
+	draft.compare_page = 0
 	_render()
 	_render_details()
 	if narrow and show_details: _section(2)
@@ -427,6 +452,10 @@ func _render_details() -> void:
 	var rarity := _label(ItemTiers.label(str(item.rarity)).to_upper() + " · " + _owner(item), 10 if compact else 11, color)
 	rarity.max_lines_visible = 2
 	titles.add_child(rarity)
+	if bool(draft.get("comparing", false)):
+		_render_comparison(item)
+		_detail_actions(recipe)
+		return
 	var stat_frame := _frame(details, "ForgeResultStats", 5)
 	var stats := VBoxContainer.new()
 	stats.add_theme_constant_override("separation", 2)
@@ -474,28 +503,96 @@ func _render_details() -> void:
 	status.tooltip_text = _requirements(recipe)
 	status.mouse_filter = MOUSE_FILTER_PASS
 	details.add_child(status)
+	_detail_actions(recipe)
+
+func _detail_actions(recipe: Dictionary) -> void:
 	var space := Control.new()
 	space.size_flags_vertical = SIZE_EXPAND_FILL
 	details.add_child(space)
 	var cost := _label("Custo: %d ouro + %d cristais" % [recipe.gold_cost, recipe.crystal_cost], 11 if compact else 13, ART.GOLD)
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	details.add_child(cost)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	details.add_child(actions)
 	var action := _button("FORJAR", true, 30 if compact else 38)
 	action.name = "ForgeSelectedAction"
+	action.size_flags_horizontal = SIZE_EXPAND_FILL
 	action.disabled = not SaveManager.can_forge(str(recipe.id))
 	action.pressed.connect(_forge.bind(str(recipe.id)))
-	details.add_child(action)
+	actions.add_child(action)
+	var compare := _button("VER RECEITA" if bool(draft.get("comparing", false)) else "COMPARAR", false, 30 if compact else 38)
+	compare.name = "ForgeCompare"
+	compare.action_font_size = 10 if compact else 11
+	compare.size_flags_horizontal = SIZE_EXPAND_FILL
+	compare.pressed.connect(func() -> void:
+		draft.comparing = not bool(draft.get("comparing", false))
+		draft.compare_page = 0
+		_render_details())
+	actions.add_child(compare)
+
+func _render_comparison(item: EquipmentData) -> void:
+	var owner := str(item.class_id) if item.class_id != &"" else str(SaveManager.data.selected_class)
+	var equipped: EquipmentData = EquipmentManager.equipped_item(owner, str(item.slot))
+	var equipped_name := equipped.display_name if equipped != null else "Espaço vazio"
+	var label := _label("EM USO · " + str(ContentCatalog.classes[owner].display_name) + " · " + equipped_name, 10 if compact else 11, ART.GOLD)
+	label.name = "ForgeEquippedComparison"
+	_single_line(label)
+	label.tooltip_text = "Comparando com " + equipped_name + "\n" + (equipped.description if equipped != null else "Nenhum item equipado neste espaço.")
+	label.mouse_filter = MOUSE_FILTER_PASS
+	details.add_child(label)
+	var before_power := equipped.power_score() if equipped != null else 0.0
+	var power := _label("Poder: %d → %d (%s)" % [roundi(before_power), roundi(item.power_score()), COMPARISON.number("power", item.power_score() - before_power, true)], 11, ART.TEXT)
+	power.name = "ForgePowerComparison"
+	power.tooltip_text = "O poder ajuda a ordenar os itens. Compare os atributos e os efeitos para escolher sua combinação."
+	power.mouse_filter = MOUSE_FILTER_PASS
+	details.add_child(power)
+	var rows: Array[Dictionary] = COMPARISON.rows(item, equipped)
+	var capacity := 2 if compact else 4
+	var pages := maxi(1, ceili(float(rows.size()) / capacity))
+	var page := clampi(int(draft.get("compare_page", 0)), 0, pages - 1)
+	draft.compare_page = page
+	for index in range(page * capacity, mini(rows.size(), (page + 1) * capacity)):
+		var row: Dictionary = rows[index]
+		var line := HBoxContainer.new()
+		line.set_meta("comparison", row)
+		line.name = "CompareStat_" + str(row.key)
+		line.add_theme_constant_override("separation", 8)
+		details.add_child(line)
+		var name_label := _label(str(row.name), 11, ART.MUTED)
+		name_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		_single_line(name_label)
+		line.add_child(name_label)
+		var numbers := _label(COMPARISON.number(str(row.key), float(row.before)) + " → " + COMPARISON.number(str(row.key), float(row.after)), 11, ART.TEXT)
+		numbers.autowrap_mode = TextServer.AUTOWRAP_OFF
+		line.add_child(numbers)
+		var delta := _label(COMPARISON.number(str(row.key), float(row.delta), true), 11, ART.GREEN if float(row.delta) > 0 else (Color("#ffa494") if float(row.delta) < 0 else ART.MUTED))
+		delta.autowrap_mode = TextServer.AUTOWRAP_OFF
+		line.add_child(delta)
+	if pages > 1:
+		var pager := HBoxContainer.new()
+		pager.alignment = BoxContainer.ALIGNMENT_CENTER
+		details.add_child(pager)
+		for direction in [-1, 1]:
+			var button := _button("←" if direction < 0 else "→", false, 26)
+			button.disabled = page == 0 if direction < 0 else page == pages - 1
+			button.pressed.connect(func() -> void:
+				draft.compare_page = page + direction
+				_render_details())
+			pager.add_child(button)
 
 func _requirements(recipe: Dictionary) -> String:
 	var item: EquipmentData = ContentCatalog.equipment[str(recipe.result)]
 	var missing := PackedStringArray()
+	if item.class_id != &"" and str(item.class_id) != str(SaveManager.data.selected_class): missing.append("Selecione " + _owner(item) + " para usar seu estoque")
+	if SaveManager.is_equipment_favorite(str(item.id)): missing.append("Item favorito protegido")
 	if item.generated:
 		if not SaveManager.is_class_unlocked(str(item.class_id)): missing.append("Recrute " + _owner(item))
 		if item.required_difficulty > int(SaveManager.data.highest_difficulty): missing.append("Dificuldade " + CampaignRules.difficulty_name(item.required_difficulty))
 		elif not SaveManager.phase_unlocked(str(item.region_id), 1, item.required_difficulty): missing.append("Desbloqueie a região de origem")
-		if SaveManager.data.equipment.has(str(item.id)) or int(SaveManager.data.forge_upgrades.get(str(recipe.id), 0)) > 0: missing.append("Equipamento já criado")
 	for ingredient in recipe.get("ingredients", []):
 		var have: int = SaveManager.equipment_quantity(str(ingredient.id))
+		if SaveManager.is_equipment_favorite(str(ingredient.id)): missing.append("Ingrediente favorito protegido")
 		var need := int(ingredient.get("qty", 1))
 		if have < need: missing.append("Falta: %s (%d/%d)" % [ingredient.get("name", ingredient.id), have, need])
 	if int(SaveManager.data.gold) < int(recipe.gold_cost): missing.append("Ouro insuficiente")
@@ -525,13 +622,10 @@ func _owner(item: EquipmentData) -> String:
 func _tooltip(item: EquipmentData) -> String:
 	return item.display_name + "\n" + ItemTiers.label(str(item.rarity)) + " · " + _owner(item) + "\n" + item.description + "\nPoder: " + str(roundi(item.power_score()))
 
-func _icon(item: EquipmentData, pixels: float) -> TextureRect:
-	var icon := TextureRect.new()
-	var key := str(ICON.WEAPONS.get(str(item.class_id), "sword")) if item.slot == &"weapon" else str(item.slot)
-	icon.texture = ICON.TEXTURES.get(key, ICON.TEXTURES.amulet)
+func _icon(item: EquipmentData, pixels: float) -> Control:
+	var icon := ICON.new()
+	icon.item = item
 	icon.custom_minimum_size = Vector2(pixels, pixels)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = MOUSE_FILTER_IGNORE
 	return icon
 

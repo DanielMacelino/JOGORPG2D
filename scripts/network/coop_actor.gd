@@ -15,6 +15,7 @@ func _ready() -> void:
 	phase_director = host_world.phase_director
 	player = PLAYER_SCRIPT.new()
 	player.configure(player_class, {})
+	player.equipped_weapon_id = str(NetworkSession.players[peer_id].get("weapon", player.equipped_weapon_id))
 	player.use_local_input = false
 	var stats: Dictionary = NetworkSession.players[peer_id].stats
 	for key in NetworkSession.PLAYER_STATS:

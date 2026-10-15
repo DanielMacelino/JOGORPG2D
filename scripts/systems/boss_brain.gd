@@ -23,6 +23,7 @@ func _process(delta: float) -> void:
 	if clock > 0.0:
 		return
 	clock = (2.5 if final_phase else (3.2 if second_phase else 4.2)) if sovereign else (3.6 if second_phase else 5.2)
+	actor.play_attack((actor.player.global_position - actor.global_position).normalized())
 	for spec in patterns():
 		attack_requested.emit(spec)
 	attack_index += 1
@@ -37,6 +38,13 @@ func patterns() -> Array[Dictionary]:
 	var alternate := attack_index % 2 == 1
 	var amount := actor.damage * (1.15 if second_phase else 1.0)
 	match str(actor.kind):
+		"minotaur":
+			if alternate:
+				result.append(_ring(origin, 200 if second_phase else 165, 70, amount))
+			else:
+				var axe := _spec("line", origin, 36, amount * 1.25)
+				axe["end"] = target + direction * 145
+				result.append(axe)
 		"goblin_king":
 			if alternate:
 				for offset in [Vector2(-95, 0), Vector2(95, 0)]:
@@ -89,6 +97,11 @@ func _sovereign_patterns(origin: Vector2, target: Vector2, direction: Vector2, a
 	var result: Array[Dictionary] = []
 	var axis := direction.orthogonal()
 	match str(actor.kind):
+		"minotaur":
+			for side in [-1.0, 1.0]:
+				var cleave := _spec("line", origin + axis * side * 75, 27, amount)
+				cleave["end"] = target + direction * 180 + axis * side * 75
+				result.append(cleave)
 		"goblin_king":
 			# A pincer charge leaves the space between the two lines safe.
 			for side in [-1.0, 1.0]:

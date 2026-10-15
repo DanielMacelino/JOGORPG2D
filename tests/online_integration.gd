@@ -21,8 +21,16 @@ var stress := false
 var maximum_prediction_step_ms := 0.0
 var early_motion_correction := 0.0
 var saw_boss_music := false
+var saw_match_music := false
 var saw_attack_animation := false
 var max_revival_progress := 0.0
+var saw_demon := false
+var saw_bloom := false
+var saw_rootling := false
+var saw_grove := false
+var new_species: Dictionary = {}
+var saw_sheet_special := false
+var saw_sheet_death := false
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -47,6 +55,10 @@ func _run() -> void:
 	save.data.gold = 0
 	for phase in range(1, 5):
 		assert(save.complete_phase("verdant_reach", phase, 0))
+	var equipped_class := "warrior" if role == "host" else local_class
+	var equipped_id := "gear_sheet_shield_1_0" if role == "host" else ("gear_sheet_weapon_02_0" if local_class == "ranger" else ("gear_mage_weapon_verdant_reach_1_0" if local_class == "mage" else "gear_druid_weapon_verdant_reach_1_1"))
+	save.unlock_equipment(equipped_id)
+	assert(root.get_node("EquipmentManager").equip("weapon", equipped_id, equipped_class))
 	original_gold = int(save.data.gold)
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
@@ -60,6 +72,13 @@ func _run() -> void:
 		assert(session.start())
 		await _until(func() -> bool: return main.active_game != null and main.active_game.started)
 		var game: Node = main.active_game
+		game._toggle_pause()
+		game._open_pause_settings()
+		assert(not paused and is_instance_valid(game.pause_settings_layer), "Online settings must not pause the party")
+		game._toggle_pause()
+		assert(game.pause_layer.visible and game.pause_settings_layer == null)
+		game._toggle_pause()
+		assert(game.pause_layer == null)
 		game.wave_director.set_process(false)
 		game.phase_director.set_process(false)
 		_disable_fixture_obstacles(game)
@@ -67,6 +86,7 @@ func _run() -> void:
 			_add_stress_world(game)
 		var remote_id: int = session.players.keys().filter(func(id: int) -> bool: return id != 1)[0]
 		var remote: Node = game.actors[remote_id]
+		assert(remote.player.equipped_weapon_id == session.players[remote_id].weapon, "Host renders each guest's actual equipped model")
 		var start_position: Vector2 = remote.player.global_position
 		await _until(func() -> bool: return remote.player.global_position.x > start_position.x + 40)
 		assert(remote.player.global_position.x > start_position.x + 40, "Client input must move the authoritative player: peer=%s start=%s end=%s ack=%s received=%s moving_commands=%s dead=%s speed=%s" % [session.players[remote_id].name, start_position, remote.player.global_position, session.acknowledged_inputs.get(remote_id, 0), session.received_input_sequences.get(remote_id, 0), session.simulated_motion_commands.get(remote_id, 0), remote.player.is_dead, remote.player.move_speed])
@@ -84,6 +104,21 @@ func _run() -> void:
 		for rank in remote.abilities.levels.values(): total_ranks += int(rank)
 		assert(total_ranks >= 2)
 		assert(not game.accept_choice(1, "rapid_hands", game.choice_round - 1), "Old choice rounds cannot grant another rank")
+		for kind in [&"red_orb", &"barrel_beast", &"demon_a", &"blood_monster", &"canarinho", &"spore_zombie", &"azure_slime", &"death_lord", &"lava_lord", &"vampire_king", &"frost_guardian", &"mire_queen"]:
+			var added: Node = game.enemy_manager.spawn(kind, 4, Vector2(350, 150))
+			added.health = 20000
+			added.max_health = 20000
+			added.damage = 0
+			added.speed = 0
+			if added.has_node("BossBrain"): added.get_node("BossBrain").set_process(false)
+		remote._cast_special("arcane_bloom", 2)
+		remote._summon_companions("rootling", 2, 20)
+		remote._cast_special("living_grove", 2)
+		var chest: Node = game.enemy_manager.spawn(&"loot_mimic", 4, Vector2(250, 200))
+		chest.set_physics_process(false)
+		await create_timer(0.6).timeout
+		chest.take_hit(chest.health + chest.defense + 1)
+		assert(game.mimic_loot_awarded and game.run_items.size() == 1)
 		var original_skills: Dictionary = remote.abilities.levels.duplicate()
 		remote.set_process(false)
 		for id in remote.abilities.chooseable(): remote.abilities.levels[id] = 5
@@ -121,12 +156,15 @@ func _run() -> void:
 		game._update_revives(0.01)
 		game._update_revives(1.0)
 		assert(game.player.revive_progress > 0.2)
+		var saved_revival: float = game.player.revive_progress
 		remote.player.take_damage(10, true)
 		game._update_revives(0.1)
-		assert(game.player.revive_progress == 0.0, "Taking damage interrupts revival")
+		assert(game.player.revive_progress == saved_revival, "Taking damage pauses revival without erasing progress")
 		remote.player.position = Vector2(600, 600)
 		game._update_revives(1.0)
-		assert(game.player.is_dead and game.player.revive_progress == 0.0)
+		assert(game.player.is_dead and game.player.revive_progress == saved_revival)
+		# Keep the preserved partial state observable through delayed world packets.
+		await create_timer(0.6).timeout
 		remote.player.position = game.player.position + Vector2(30, 0)
 		game._update_revives(0.01)
 		game.collective_paused = true
@@ -148,6 +186,7 @@ func _run() -> void:
 		game.boss.take_hit(100000)
 		assert(game.run_finished and game.result_layer != null)
 		assert(int(save.data.gold) > original_gold and save.phase_completed("verdant_reach", 5, 0))
+		assert(save.has_relic("blood_pact", "warrior") and not save.has_relic("blood_pact", "druid"))
 		var banked_gold: int = save.data.gold
 		session._results(session.run_id, {})
 		assert(int(save.data.gold) == banked_gold, "Repeated result packets must never duplicate rewards")
@@ -181,6 +220,7 @@ func _run() -> void:
 		await _until(func() -> bool: return main.active_game != null and main.active_game.started)
 		_disable_fixture_obstacles(main.active_game)
 		assert(main.active_game.replica.visuals.has("P%d" % session.multiplayer.get_unique_id()), "Starting positions arrive before controls are enabled")
+		assert(main.active_game.replica.visuals.P1.equipped_weapon_id == session.players[1].weapon, "Clients render the host's actual sword/shield model")
 		Input.action_press("move_right")
 		print("INPUT PROBE %s: start_seq=%d direction=%s" % [role, session.input_sequence, session.local_direction()])
 		var predicted_before: Vector2 = main.active_game.player.position
@@ -194,11 +234,17 @@ func _run() -> void:
 		await _until(func() -> bool: return main.active_game.run_finished)
 		assert(saw_revival_progress and saw_revived_host, "Clients synchronize revival: %s dead=%s max_progress=%s revived=%s seq=%d" % [role, saw_any_dead_host, max_revival_progress, saw_revived_host, session.last_snapshot_sequence])
 		assert(choices_taken >= 1, "Client must receive and choose its own skills")
+		assert(main.active_game.mimic_loot_awarded and main.active_game.run_items.size() == 1, "Each client receives and saves its own mimic item")
 		for type in ["P", "E", "Q", "D", "M", "C", "F"]:
 			assert(observed.has(type), "Client must see synchronized " + type)
 		assert(int(save.data.gold) > original_gold and save.phase_completed("verdant_reach", 5, 0))
 		assert(int(save.data.class_progression[local_class].xp) > 0)
-		assert(saw_boss_music and saw_attack_animation, "Clients receive the boss soundtrack and articulated attack state")
+		assert(saw_match_music and saw_boss_music and saw_attack_animation, "Clients switch from quiet wave music to the boss soundtrack and receive attack state")
+		assert(saw_sheet_special and saw_sheet_death, "New character sheets synchronize special poses and downed animation")
+		assert(saw_demon and saw_bloom, "Clients receive the new demon and expanding spell Sprite2D animation")
+		assert(saw_rootling and saw_grove, "Guests must see native rootling sprites and summoned trees: rootling=%s grove=%s" % [saw_rootling, saw_grove])
+		for kind in ["blood_monster", "canarinho", "spore_zombie", "azure_slime", "death_lord", "lava_lord", "vampire_king", "frost_guardian", "mire_queen"]: assert(new_species.has(kind), "Missing replicated pixel creature: " + kind)
+		assert(save.has_relic("blood_pact", local_class) and not save.has_relic("blood_pact", "warrior"), "Online relic discoveries belong to the class actually played")
 		_assert_loot(main.active_game, save)
 		if delay_ms > 0:
 			assert(session.rtt_ms > delay_ms, "The test must exercise genuinely delayed acknowledgements")
@@ -240,6 +286,8 @@ func _monitor() -> void:
 		if game.experience.level == 1 and session.player_snapshots_received > 8:
 			early_motion_correction = maxf(early_motion_correction, game.replica.reconciliation.length())
 		saw_boss_music = saw_boss_music or (game.boss_music_active and root.get_node("AudioManager").music_player.stream == root.get_node("AudioManager").boss_stream)
+		var audio: Node = root.get_node("AudioManager")
+		saw_match_music = saw_match_music or (audio.music_player.playing and audio.music_player.stream == audio.match_stream and audio.music_player.volume_db <= -12.0)
 		var host_player: Node = game.replica.visuals.get("P1")
 		if host_player != null:
 			saw_any_dead_host = saw_any_dead_host or bool(host_player.is_dead)
@@ -249,6 +297,20 @@ func _monitor() -> void:
 			if saw_revival_progress and not host_player.is_dead:
 				saw_revived_host = true
 		for node in game.replica.visuals.values():
+			if node.get_script() == game.replica.PLAYER and preload("res://scripts/data/character_sheet.gd").has_class(node.player_class):
+				assert(node.has_node("CharacterSprite"))
+				saw_sheet_special = saw_sheet_special or (node.attack_special and node.attack_time > 0)
+				saw_sheet_death = saw_sheet_death or (node.is_dead and node.death_elapsed > 0.1)
+			if node.get_script() == game.replica.ENEMY and node.kind in [&"blood_monster", &"canarinho", &"spore_zombie", &"azure_slime", &"death_lord", &"lava_lord", &"vampire_king", &"frost_guardian", &"mire_queen"]:
+				assert(node.has_node("PixelSprite"))
+				new_species[str(node.kind)] = true
+			if node.get_script() == game.replica.COMPANION:
+				if node.kind == "rootling": saw_rootling = node.has_node("RootlingSprite")
+				if node.kind == "grove_tree": saw_grove = true
+			if node.get_script() == game.replica.ENEMY and node.kind == &"demon_a":
+				saw_demon = node.has_node("PixelSprite")
+			if node.get_script() == game.replica.SKILL_EFFECT and node.kind == "arcane_bloom":
+				saw_bloom = is_instance_valid(node.bloom_sprite) and node.bloom_sprite.region_enabled
 			if node.get_script() == game.replica.PLAYER and node.attack_serial > 0:
 				saw_attack_animation = true
 			for type in game.replica.FIELDS:
@@ -290,9 +352,9 @@ func _add_stress_world(game: Node) -> void:
 
 func _assert_loot(game: Node, save: Node) -> void:
 	var loot: Control = game.result_layer.find_child("RunRewards", true, false)
-	assert(loot != null and loot.items.size() == 3, "Boss reward and both collective level rewards are shown")
+	assert(loot != null and loot.items.size() == 4, "Mimic, boss reward and both collective level rewards are shown")
 	for entry in loot.items:
-		assert(save.data.equipment.has(str(entry.id)), "The screen shows genuinely awarded personal items")
+		assert(save.equipment_quantity(str(entry.id), game.player_class) > 0, "The screen shows items genuinely awarded to the class played")
 	assert(not game.boss_music_active and not root.get_node("AudioManager").music_player.playing)
 
 func _until(condition: Callable) -> void:

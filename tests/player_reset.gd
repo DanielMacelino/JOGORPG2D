@@ -29,8 +29,9 @@ func run(tree: SceneTree) -> void:
 	save.data.statistics.total_runs = 100
 	save.data.bestiary_kills = {"goblin": 300}
 	save.data.achievements = {"first_blood": true}
-	save.data.relics = ["old_relic"]
-	save.data.equipped_relics = ["old_relic"]
+	save.character_meta().relics = ["old_relic"]
+	save.character_meta().equipped_relics = ["old_relic"]
+	save.data.favorite_equipment = ["field_blade"]
 	save.data.forge_upgrades = {"old_recipe": true}
 	save.data.active_bounties = ["old_bounty"]
 	save.data.completed_bounties = ["old_bounty"]
@@ -40,8 +41,8 @@ func run(tree: SceneTree) -> void:
 	save.data.legacy_extra = 999
 	for owner in save.data.class_progression:
 		save.data.class_progression[owner] = {"xp": 20000, "talents": talents.ROOTS + [talents.node_id(1, 0)], "last_xp": 1500}
-	for upgrade in save.data.upgrades:
-		save.data.upgrades[upgrade] = 25
+	for upgrade in save.upgrades_for():
+		save.upgrades_for()[upgrade] = 25
 	save.save_game()
 	var dirty: Dictionary = save.data.duplicate(true)
 	var previous_file := FileAccess.get_file_as_string(save.SAVE_PATH)
@@ -85,7 +86,8 @@ func run(tree: SceneTree) -> void:
 	assert(tree.root.get_node("NetworkSession").config.is_empty() and tree.root.get_node("NetworkSession").local_profile.is_empty())
 	assert(save.data.gold == 0 and save.data.crystals == 0 and save.data.account_xp == 0 and save.data.best_wave == 0)
 	assert(save.data.settings == save.DEFAULT_SAVE.settings)
-	assert(save.data.unlocked_classes == save.DEFAULT_SAVE.unlocked_classes and save.data.equipment == save.DEFAULT_SAVE.equipment)
+	assert(save.data.unlocked_classes == save.DEFAULT_SAVE.unlocked_classes and save.data.equipment == ["field_blade"])
+	assert(save.owned_equipment("mage") == ["moon_staff"] and save.owned_equipment("ranger") == ["thorn_bow"])
 	assert(save.data.unlocked_maps == ["verdant_reach"] and save.data.highest_difficulty == 0 and save.data.campaign_progress == {"0": 0})
 	assert(not save.data.has("legacy_extra"))
 	for owner in save.data.class_progression:
@@ -93,7 +95,7 @@ func run(tree: SceneTree) -> void:
 		assert(save.data.class_progression[owner].talents == talents.ROOTS and talents.character_level(owner) == 1 and talents.spent_points(owner) == 0)
 	for key in ["bestiary_kills", "achievements", "relics", "equipped_relics", "forge_upgrades", "active_bounties", "completed_bounties", "bounty_progress", "pending_achievement_rewards"]:
 		assert(save.data[key].is_empty(), "Reset clears " + key)
-	for amount in save.data.upgrades.values():
+	for amount in save.upgrades_for().values():
 		assert(amount == 0)
 	assert(save.data.statistics.total_runs == 0 and game_manager.active_class == "warrior" and not game_manager.run_active)
 	var fresh: Dictionary = save.data.duplicate(true)

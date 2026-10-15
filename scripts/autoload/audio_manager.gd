@@ -2,6 +2,8 @@ extends Node
 
 var boss_stream: AudioStreamMP3
 var menu_stream: AudioStreamMP3
+var match_stream: AudioStreamMP3
+const MATCH_VOLUME_DB := -15.0
 var click_stream: AudioStreamMP3
 
 var music_fade: Tween
@@ -24,6 +26,8 @@ func _ready() -> void:
 		add_child(player)
 		effect_players.append(player)
 	menu_stream = load("res://assets/audio/music/musicfundo.mp3") as AudioStreamMP3
+	match_stream = load("res://assets/audio/music/music_match.mp3") as AudioStreamMP3
+	if match_stream != null: match_stream.loop = true
 	boss_stream = load("res://assets/audio/music/musicaboss.mp3") as AudioStreamMP3
 	if boss_stream != null:
 		boss_stream.loop = true
@@ -40,6 +44,10 @@ func _ready() -> void:
 		"wave": _tone([220.0, 329.63], 0.30, 0.0),
 		"boss": _tone([329.63, 440.0, 554.37, 659.25], 0.65, 0.0),
 		"talent": _tone([392.0, 587.33], 0.24, 0.0),
+		"socket": _tone([620.0, 830.0], 0.12, 0.0),
+		"fusion_start": _tone([146.83, 220.0, 293.66, 440.0], 1.5, 0.08),
+		"fusion_success": _tone([523.25, 659.25, 783.99, 1046.5], 0.75, 0.0),
+		"fusion_fail": _tone([329.63, 293.66, 220.0], 0.5, 0.0),
 	}
 
 func _wire_existing(node: Node) -> void:
@@ -70,6 +78,12 @@ func boss_music(enabled: bool) -> void:
 	elif music_player.stream == boss_stream:
 		menu_music(false)
 
+func match_music(enabled: bool) -> void:
+	if enabled:
+		play_music(match_stream, 0.8, MATCH_VOLUME_DB)
+	elif music_player.stream == match_stream:
+		menu_music(false)
+
 func _ensure_bus(bus_name: String) -> void:
 	if AudioServer.get_bus_index(bus_name) >= 0:
 		return
@@ -82,7 +96,7 @@ func apply_settings() -> void:
 	_set_bus_volume("Music", float(settings.get("music", 0.65)))
 	_set_bus_volume("SFX", float(settings.get("effects", 0.85)))
 
-func play_music(stream: AudioStream, fade_seconds: float = 0.5) -> void:
+func play_music(stream: AudioStream, fade_seconds: float = 0.5, target_db: float = 0.0) -> void:
 	if music_player.stream == stream and music_player.playing:
 		return
 	if stream == null:
@@ -91,14 +105,14 @@ func play_music(stream: AudioStream, fade_seconds: float = 0.5) -> void:
 		music_fade.kill()
 		music_fade = null
 	music_player.stream = stream
-	music_player.volume_db = -36.0 if fade_seconds > 0.0 else 0.0
+	music_player.volume_db = -36.0 if fade_seconds > 0.0 else target_db
 	music_player.play()
 	if fade_seconds > 0.0:
 		if music_fade != null:
 			music_fade.kill()
 			music_fade = null
 		music_fade = create_tween()
-		music_fade.tween_property(music_player, "volume_db", 0.0, fade_seconds)
+		music_fade.tween_property(music_player, "volume_db", target_db, fade_seconds)
 
 func play_effect(stream: AudioStream, volume_db: float = 0.0) -> void:
 	for player in effect_players:
@@ -136,6 +150,7 @@ func _exit_tree() -> void:
 	feedback_streams.clear()
 	boss_stream = null
 	menu_stream = null
+	match_stream = null
 	click_stream = null
 
 func _tone(notes: Array, duration: float, noise_amount: float, falling: bool = false) -> AudioStreamWAV:

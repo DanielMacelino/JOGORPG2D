@@ -1,5 +1,14 @@
 extends Control
 const PORTRAITS := {
+	"blood_monster": preload("res://assets/art/enemies/pixel/blood_monster_portrait.tres"),
+	"canarinho": preload("res://assets/art/enemies/pixel/canarinho_portrait.tres"),
+	"spore_zombie": preload("res://assets/art/enemies/pixel/spore_zombie_portrait.tres"),
+	"azure_slime": preload("res://assets/art/enemies/pixel/azure_slime_portrait.tres"),
+	"demon_a": preload("res://assets/art/enemies/pixel/demon_a_portrait.tres"),
+	"loot_mimic": preload("res://assets/art/enemies/pixel/loot_mimic_portrait.tres"),
+	"red_orb": preload("res://assets/art/enemies/pixel/red_orb_portrait.tres"),
+	"barrel_beast": preload("res://assets/art/enemies/pixel/barrel_beast_portrait.tres"),
+	"minotaur": preload("res://assets/art/enemies/pixel/minotaur_portrait.tres"),
 	"archer": preload("res://assets/art/enemies/archer.svg"),
 	"ash_hound": preload("res://assets/art/enemies/ash_hound.svg"),
 	"bat": preload("res://assets/art/enemies/bat.svg"),
@@ -46,7 +55,11 @@ var enemy_id := "goblin"
 var known := true
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
+	if preload("res://scripts/data/pixel_enemy_sprites.gd").has_kind(StringName(enemy_id)): texture_filter = TEXTURE_FILTER_NEAREST
 func _draw() -> void:
 	var texture: Texture2D = PORTRAITS.get(enemy_id, PORTRAITS.goblin)
+	var sprites := preload("res://scripts/data/pixel_enemy_sprites.gd")
+	if enemy_id in ["death_lord", "lava_lord", "vampire_king", "frost_guardian", "mire_queen"]:
+		texture = sprites.portrait_for(enemy_id)
 	var extent := texture.get_size() * minf(size.x / texture.get_width(), size.y / texture.get_height())
 	draw_texture_rect(texture, Rect2((size - extent) * 0.5, extent), false, Color.WHITE if known else Color(0.3, 0.4, 0.3, 0.5))

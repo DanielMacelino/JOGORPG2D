@@ -19,28 +19,38 @@ func run(tree: SceneTree) -> void:
 	panel.set_filter("strength")
 	assert(panel.matched_ids == ["might", "crit_mastery"])
 	panel.select_upgrade("might")
-	var cost := PermanentUpgrades.cost("might", save.data.upgrades)
+	var cost := PermanentUpgrades.cost("might", save.upgrades_for())
 	var gold: int = save.data.gold
 	panel.find_child("SelectedUpgradeAction", true, false).pressed.emit()
 	await _settle(tree)
 	assert(save.upgrade_level("might") == 1 and save.data.gold == gold - cost)
 	assert(panel == main.page_root.find_child("UpgradesPanel", true, false), "Purchase must refresh in place")
 	assert(panel.filter_id == "strength" and panel.selected_id == "might" and panel.page_index == 0)
-	assert(panel.find_child("UpgradeBonusPreview", true, false).text.contains("+0,1% → +0,2%"))
+	assert(panel.find_child("UpgradeBonusPreview", true, false).text.contains("+0,02% → +0,04%"))
 	save.load_game()
 	assert(save.upgrade_level("might") == 1 and save.data.gold == gold - cost)
-	for rank in range(1, 10): assert(panel.purchase("might"))
+	var max_quote := PermanentUpgrades.max_quote("might", save.upgrades_for())
+	save.data.gold = int(max_quote.cost) - 1
+	panel._refresh()
+	assert(panel.find_child("MaxUpgrade_might", true, false).disabled)
+	assert(panel.find_child("SelectedMaxUpgrade_might", true, false).disabled)
+	save.data.gold = max_quote.cost
+	panel._refresh()
+	assert(not panel.find_child("MaxUpgrade_might", true, false).disabled)
+	panel.find_child("MaxUpgrade_might", true, false).pressed.emit()
+	assert(save.upgrade_level("might") == 10 and save.data.gold == 0)
+	save.data.gold = 100000
 	gold = save.data.gold
 	assert(not panel.purchase("might") and save.data.gold == gold, "Tier gate must block extra purchases")
 	assert(panel.find_child("SelectedUpgradeAction", true, false).disabled)
-	for id in PermanentUpgrades.IDS: save.data.upgrades[id] = 10
-	save.data.upgrades.might = 9
+	for id in PermanentUpgrades.IDS: save.upgrades_for()[id] = 10
+	save.upgrades_for().might = 9
 	panel._refresh()
 	assert(panel.mastery_bar.value == 79)
 	assert(panel.purchase("might"))
 	assert(panel.mastery_bar.value == 0 and panel.mastery_label.text.contains("PATAMAR 2"))
-	assert(panel.mastery_label.text.contains("+0,5%") and panel._local_rank("might") == 0)
-	assert(panel.find_child("UpgradeBonusPreview", true, false).text.contains("+1% → +1,5%"))
+	assert(panel.mastery_label.text.contains("+0,03%") and panel._local_rank("might") == 0)
+	assert(panel.find_child("UpgradeBonusPreview", true, false).text.contains("+0,2% → +0,23%"))
 	save.data.gold = 0
 	panel._refresh()
 	assert(panel.find_child("SelectedUpgradeAction", true, false).disabled)

@@ -1,6 +1,12 @@
 # Movimento e sincronizacao online
 
-Protocolo atual: ashenwild-coop-7. Todos os participantes precisam usar a mesma versao do jogo no proximo executavel. Esta alteracao nao exporta o jogo.
+Protocolo atual: ashenwild-coop-14. Inclui os inimigos pixel art, o Demônio da Fenda, a Eclosão do Éter, loot individual do Baú Raivoso e sincronização do modelo de arma equipado por cada jogador. Todos os participantes precisam usar a mesma versão do jogo no próximo executável. Esta alteração não exporta o jogo.
+
+## Pressão por tamanho do grupo
+
+O dano de monstros e chefes recebe pressão adicional de +20% com dois jogadores, +30% com três e +40% com quatro. Um jogador usa multiplicador adicional 1,0. O cálculo acontece no anfitrião ao gerar inimigos, inclusive chefes e elites. O HP segue `1 + 0,80 × jogadores adicionais`; o dano final segue `(1 + 0,08 × jogadores adicionais) × pressão`. Para grupos de 2/3/4 jogadores, o dano final em relação ao solo é 1,296 / 1,508 / 1,736. Em relação à atualização anterior, o dano sobe aproximadamente 9% / 13% / 17%. Os formatos e frequências dos pacotes de movimento permanecem iguais.
+
+`tests/coop_pressure_forge.gd` verifica os inimigos e chefes gerados com 1 a 4 participantes, o multiplicador offline e as ações/comparações da Forja.
 
 ## Causas corrigidas
 
@@ -18,6 +24,10 @@ Agora cada comando representa um passo de 1/60 s. As posicoes iniciais da equipe
 snapshot_codec.gd codifica os campos em listas posicionais antes da compressao, preservando tipos e reduzindo nomes repetidos. O simulador de perdas/atraso e desabilitado em jogo normal e so pode ser configurado em projetos de teste isolados.
 
 ## Validacao
+
+A reanimação conserva o progresso quando o ajudante se afasta ou toma dano. Receber dano suspende o avanço por 0,8 segundo; depois ele continua se houver um aliado vivo por perto. A escolha coletiva de habilidades mantém a reanimação congelada. As barras da equipe no canto inferior esquerdo mostram nome, retrato, vida e progresso de reanimação no anfitrião e nos clientes.
+
+A pausa oferece Configurações com volumes e tamanho da interface. Esc volta das configurações à pausa e depois retoma a partida, inclusive no solo com a árvore de cena pausada. No online, abrir esse menu continua sendo uma pausa local. Os ícones de habilidades mostram o bônus acumulado (por exemplo, +48% de velocidade de ataque); valores fixos usam a unidade real e o tooltip detalha todos os efeitos.
 
 network_motion.gd compara 120 passos do cliente e servidor, incluindo parede e movimento diagonal, perda intencional de um em cada tres envios, pacotes duplicados, pausa, morte, fidelidade do formato e rejeicao de entidades removidas.
 

@@ -1,0 +1,17 @@
+# Menu principal
+
+O menu segue a referência enviada: ouro e cristais no topo esquerdo, assinatura ASHENWILD com rosa dos ventos, texto e início da expedição na coluna esquerda, Jogar Online e Configurações juntos abaixo e cinco placas ilustradas na base. Os atalhos continuam levando a Preparar Personagem, Arsenal, Talentos, Mundos e Registros. O nome, o nível, os pontos de talento e os registros do personagem continuam usando os dados reais do save.
+
+Os botões usam placas de metal envelhecido, molduras e relevos de personagem, armas, árvore, mapa e pergaminho. O botão principal usa pergaminho dourado. Todas as legendas, ícones pequenos, áreas de clique e ações são componentes da Godot; a arte não tem palavras embutidas. As extremidades do botão longo são desenhadas separadamente para evitar deformar os ornamentos. Os efeitos de hover preservam a área de clique.
+
+Em 1024 × 578, os cinco atalhos ficam na mesma linha, com proporções e recuos próximos da referência. Em telas menores, a grade se reorganiza e janelas baixas usam uma composição mais compacta. O menu usa o ajuste de área disponível, sem rolagem. O menu e Mundos têm opacidade final de 100%; os demais menus preservam sua configuração anterior.
+
+`tests/home_plaques.gd` verifica oito resoluções e duas escalas, alinhamento dos cinco atalhos, limites da janela, área de clique, navegação, estabilidade do hover e opacidade de Mundos. Os testes usam um projeto e armazenamento isolados.
+
+## Arte
+
+Arquivo: `assets/art/home-menu-plaques.png`, gerado com a ferramenta integrada de imagegen. `scripts/ui/menu/menu_plaque.gd` define os seis recortes, excluindo a margem preta inferior do atlas. As texturas usam filtragem linear.
+
+Prompt final:
+
+> Use case: stylized-concept. Asset type: a production UI texture atlas containing SIX dark-fantasy RPG menu button plaques, arranged in an EXACT regular grid of 3 columns and 2 rows. Canvas ratio 15:4, very wide, each cell is a 5:2 horizontal rectangle, all six cells equal size and occupying their entire grid cell, no gutters or outer margins. Each is an antique weathered bronze/stone embossed rectangular plaque with slim double-beveled borders and extremely delicate gold corner filigree, like an ornate old fantasy RPG menu. Crisp sculpted relief with real tactile edges, muted pewter, dark olive bronze, bone-gray metal; restrained pale warm gold highlights. IMPORTANT: NO TEXT, NO LETTERS, NO SYMBOLS RESEMBLING LETTERS, NO NUMBERS on any plaque. Keep the LEFT HALF of each plaque plain, dark and visually quiet for native UI text and a small icon to be added in the game. On the RIGHT HALF of each cell, a detailed raised metallic illustration: TOP LEFT a frontal hooded adventurer bust in circular relief; TOP MIDDLE crossed sword and axe over a round shield; TOP RIGHT stylized many-branched ancient tree relief; BOTTOM LEFT a small hand-painted green parchment geographical map with a winding blue river, framed inside the plaque; BOTTOM MIDDLE an aged parchment scroll in raised round shield relief; BOTTOM RIGHT a plain softly luminous gold parchment button with fine intricate vine filigree on both ends and a quiet bright golden center, reserved as the main action. All plaques have matching border thickness and corner style. The interface aesthetic is dark forest gothic fantasy, handmade antique engraved metal, not modern flat buttons, not neon, not cartoon, no glow except slight warm rim highlights. Image is ONLY the six texture cells, no screenshot, no background scenery, no other elements.

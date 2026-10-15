@@ -19,7 +19,7 @@ func run(tree: SceneTree) -> void:
 	panel.toggle_relic("blood_pact")
 	assert(save.get_equipped_relics().is_empty(), "Locked relic cannot be equipped")
 	panel.select_relic("blood_pact")
-	assert(panel.find_child("RelicUnlockCondition", true, false).text == "Conquista: Matador De Reis")
+	assert(panel.find_child("RelicUnlockCondition", true, false).text == "Derrote um chefe com este personagem.")
 	var textures: Dictionary = {}
 	for data in ContentCatalog.relics:
 		textures[panel.COPY.texture(str(data.id)).resource_path] = true

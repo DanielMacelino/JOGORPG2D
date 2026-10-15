@@ -3,7 +3,7 @@ signal changed
 signal launch_requested(config: Dictionary)
 signal session_closed(reason: String)
 signal lobby_requested
-const PROTOCOL := "ashenwild-coop-7"
+const PROTOCOL := "ashenwild-coop-14"
 const CODEC := preload("res://scripts/network/snapshot_codec.gd")
 const INPUT_STEP := 1.0 / 60.0
 const INPUT_REDUNDANCY := 8
@@ -65,6 +65,7 @@ func _ready() -> void:
 func profile(nickname: String, class_id: String) -> Dictionary:
 	var actor := SurvivorPlayer.new()
 	actor.configure(class_id, {})
+	var weapon := actor.equipped_weapon_id
 	var stats := {}
 	for key in PLAYER_STATS:
 		stats[key] = actor.get(key)
@@ -75,7 +76,7 @@ func profile(nickname: String, class_id: String) -> Dictionary:
 			for phase in range(1, 11):
 				if SaveManager.phase_unlocked(region, phase, tier):
 					unlocked.append("%s:%d:%d" % [region, phase, tier])
-	return {"version": PROTOCOL, "name": nickname.strip_edges().left(24) if not nickname.strip_edges().is_empty() else "Viajante", "class": class_id, "stats": stats, "owned": SaveManager.data.equipment.duplicate(), "unlocked": unlocked}
+	return {"version": PROTOCOL, "name": nickname.strip_edges().left(24) if not nickname.strip_edges().is_empty() else "Viajante", "class": class_id, "weapon": weapon, "stats": stats, "owned": SaveManager.owned_equipment(class_id).duplicate(), "unlocked": unlocked}
 
 func host(value: Dictionary, destination: Dictionary, port: int = PORT) -> Error:
 	if active:
@@ -135,6 +136,12 @@ func _register(value: Dictionary) -> void:
 		_reject.rpc_id(id, "Personagem inválido.")
 		return
 	var clean := value.duplicate(true)
+	var weapon := str(clean.get("weapon", ContentCatalog.classes[class_id].starter_weapon))
+	var item: EquipmentData = ContentCatalog.equipment.get(weapon)
+	if item == null or item.slot != &"weapon" or item.class_id not in [&"", StringName(class_id)] or not clean.get("owned", []).has(weapon):
+		_reject.rpc_id(id, "Arma incompatível com o personagem.")
+		return
+	clean.weapon = weapon
 	clean.name = str(clean.get("name", "Viajante")).strip_edges().left(24)
 	var stats: Dictionary = clean.stats
 	for key in PLAYER_STATS:
@@ -547,6 +554,23 @@ func _group_state(token: String, paused: bool, waiting: Array) -> void:
 func finish(results: Dictionary) -> void:
 	_results.rpc(run_id, results)
 
+func award_mimic_items(rewards: Dictionary, at: Vector2) -> void:
+	if hosting and running: _mimic_items.rpc(run_id, rewards, at)
+
+@rpc("authority", "call_local", "reliable")
+func _mimic_items(token: String, rewards: Dictionary, at: Vector2) -> void:
+	if token != run_id or not running or not is_instance_valid(game) or game.run_finished or game.mimic_loot_awarded: return
+	var id := multiplayer.get_unique_id()
+	var item := str(rewards.get(id, ""))
+	var equipment: EquipmentData = ContentCatalog.equipment.get(item)
+	if equipment == null or (equipment.class_id != &"" and str(equipment.class_id) != game.player_class): return
+	if SaveManager.grant_equipment_drop(item, token + ":loot_mimic", game.player_class) != OK:
+		game._show_notice("NÃO FOI POSSÍVEL SALVAR O ITEM DO BAÚ")
+		return
+	game.mimic_loot_awarded = true
+	game.run_items.append({"id": item, "source": "miniboss", "duplicate": false})
+	game._reveal_mimic_loot(item, at)
+
 @rpc("authority", "call_local", "reliable")
 func _results(token: String, results: Dictionary) -> void:
 	if token != run_id or result_applied == token:
@@ -558,20 +582,20 @@ func _results(token: String, results: Dictionary) -> void:
 	var result: Dictionary = results[id]
 	var reward: Dictionary = result.reward
 	var gold := int(result.gold)
-	var items: Array[Dictionary] = []
+	var items: Array[Dictionary] = game.run_items.duplicate(true) if is_instance_valid(game) else []
 	if result.victory and not reward.is_empty():
 		var item := str(reward.equipment)
-		var duplicate: bool = SaveManager.data.equipment.has(item)
+		var duplicate: bool = SaveManager.equipment_quantity(item, str(result.class)) > 0
 		items.append({"id": item, "source": "boss", "duplicate": duplicate})
 		if duplicate:
 			gold += 100
 		else:
-			SaveManager.unlock_equipment(item)
+			SaveManager.unlock_equipment(item, str(result.class))
 		SaveManager.data.crystals = int(SaveManager.data.crystals) + int(reward.crystals)
 		gold += int(reward.gold)
 	for kind in result.kinds:
 		for index in int(result.kinds[kind]):
-			SaveManager.record_kill(str(kind))
+			SaveManager.record_kill(str(kind), str(result.class))
 	for ability in result.get("uses", {}):
 		for index in int(result.uses[ability]):
 			SaveManager.record_ability_use(str(ability))
@@ -581,9 +605,9 @@ func _results(token: String, results: Dictionary) -> void:
 			gold += 30
 		else:
 			items.append({"id": item, "source": "level", "duplicate": false})
-	SaveManager.record_run(int(result.wave), gold, float(result.time), int(result.kills), str(result.class), int(result.bosses), int(result.elites), float(result.damage), bool(result.victory), float(result.multiplier))
+	SaveManager.record_run(int(result.wave), gold, float(result.time), int(result.kills), str(result.class), int(result.bosses), int(result.elites), float(result.damage), bool(result.victory), float(result.multiplier), int(result.get("skill_count", 0)))
 	if result.victory:
-		SaveManager.complete_phase(str(config.map), int(config.phase), int(config.tier))
+		SaveManager.complete_phase(str(config.map), int(config.phase), int(config.tier), str(result.class))
 	result["items"] = items
 	if is_instance_valid(game):
 		game.show_coop_result(result, gold)

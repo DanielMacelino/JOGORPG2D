@@ -223,6 +223,7 @@ func _build_room() -> void:
 		var avatar := MemberPortrait.new()
 		avatar.name = "OnlineMemberPortrait" + str(id)
 		avatar.class_id = str(entry.class)
+		avatar.weapon_id = str(entry.get("weapon", ""))
 		avatar.custom_minimum_size = Vector2(42, 60) if compact_page else Vector2(68, 92)
 		row.add_child(avatar)
 		var copy := VBoxContainer.new()

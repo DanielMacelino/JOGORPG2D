@@ -53,7 +53,8 @@ func refresh() -> void:
 		button.refresh()
 	var actor := SurvivorPlayer.new()
 	actor.configure(class_id, {})
-	stats_label.text = "VIDA  %d\n\nDANO  %d\n\nVEL.  %d\n\nDEFESA  %d" % [roundi(actor.max_health), roundi(actor.damage), roundi(actor.move_speed), roundi(actor.defense)]
+	stats_label.text = "PODER  %d\n\nVIDA  %d\n\nDANO  %d\n\nVEL.  %d\n\nDEFESA  %d" % [EquipmentManager.character_power(class_id), roundi(actor.max_health), roundi(actor.damage), roundi(actor.move_speed), roundi(actor.defense)]
+	stats_label.tooltip_text = "Poder: soma do poder dos equipamentos usados por esta classe."
 	actor.free()
 	queue_redraw()
 
@@ -123,7 +124,8 @@ class SlotCard extends Button:
 		item_icon = ITEM_ICON.new()
 		item_icon.class_id = class_id
 		item_icon.slot = slot
-		item_icon.custom_minimum_size = Vector2(32, 32)
+		item_icon.inventory_frame = true
+		item_icon.custom_minimum_size = Vector2(40, 40)
 		item_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		item_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		box.add_child(item_icon)

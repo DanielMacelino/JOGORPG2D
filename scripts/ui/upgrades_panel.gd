@@ -107,7 +107,7 @@ func _ready() -> void:
 	details = VBoxContainer.new()
 	details.add_theme_constant_override("separation", 4 if compact else 5)
 	detail_frame.add_child(details)
-	notice = _label("Melhorias permanentes para todas as suas expedições.", 11, ART.MUTED)
+	notice = _label("Melhorias permanentes apenas para este personagem.", 11, ART.MUTED)
 	notice.name = "UpgradeNotice"
 	notice.visible = not compact
 	add_child(notice)
@@ -135,7 +135,7 @@ func _build_header() -> void:
 	title.name = "UpgradesTitle"
 	_single_line(title)
 	titles.add_child(title)
-	var subtitle := _label("Invista ouro para fortalecer seu viajante.", 13, ART.TEXT)
+	var subtitle := _label("%s · melhorias individuais." % ContentCatalog.classes[str(SaveManager.data.selected_class)].display_name, 13, ART.TEXT)
 	subtitle.visible = not compact
 	titles.add_child(subtitle)
 	if not compact: add_child(RECORDS.Rule.new())
@@ -151,8 +151,8 @@ func _refresh() -> void:
 		label.name = "UpgradeCurrency" + str(currencies.get_child_count())
 		label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		currencies.add_child(label)
-	var tier := PermanentUpgrades.tier(SaveManager.data.upgrades)
-	var progress := PermanentUpgrades.progress(SaveManager.data.upgrades)
+	var tier := PermanentUpgrades.tier(SaveManager.upgrades_for())
+	var progress := PermanentUpgrades.progress(SaveManager.upgrades_for())
 	mastery_label.text = "PATAMAR %d · %s · +%s por compra · %d/80" % [tier + 1, PermanentUpgrades.NAMES[tier], PermanentUpgrades.percent(PermanentUpgrades.RATES[tier]), progress]
 	mastery_label.tooltip_text = "Complete 10 níveis de cada um dos 8 atributos para abrir o próximo patamar. Os bônus se acumulam."
 	mastery_bar.value = progress
@@ -224,15 +224,19 @@ func _refresh_cards() -> void:
 		actions.size_flags_vertical = SIZE_SHRINK_CENTER
 		actions.add_theme_constant_override("separation", 2)
 		row.add_child(actions)
-		var price := _label("%d OURO" % PermanentUpgrades.cost(id, SaveManager.data.upgrades) if _can_buy(id) else "PATAMAR COMPLETO", 10 if compact else 12, ART.GOLD)
+		var price := _label("%d OURO" % PermanentUpgrades.cost(id, SaveManager.upgrades_for()) if _can_buy(id) else "PATAMAR COMPLETO", 10 if compact else 12, ART.GOLD)
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		price.autowrap_mode = TextServer.AUTOWRAP_OFF
 		if not _can_buy(id) and narrow: price.text = "10/10"
 		actions.add_child(price)
 		var action := _purchase_button(id, true)
 		action.name = "BuyUpgrade_" + id
-		action.custom_minimum_size.x = 80 if narrow else 128
-		actions.add_child(action)
+		action.custom_minimum_size.x = 64 if narrow else 88
+		var purchases := HBoxContainer.new()
+		purchases.add_theme_constant_override("separation", 3)
+		actions.add_child(purchases)
+		purchases.add_child(action)
+		purchases.add_child(_max_button(id, true))
 	var previous := _button("←", false, 30)
 	previous.name = "PreviousUpgrades"
 	previous.disabled = page_index == 0
@@ -262,7 +266,7 @@ func _refresh_details() -> void:
 	var title := _label(_title(id), 18 if compact else 24, ART.TEXT, true)
 	title.name = "SelectedUpgradeTitle"
 	details.add_child(title)
-	var tier := PermanentUpgrades.tier(SaveManager.data.upgrades)
+	var tier := PermanentUpgrades.tier(SaveManager.upgrades_for())
 	if not compact: details.add_child(_label("%s · NÍVEL %d/10" % [str(PermanentUpgrades.NAMES[tier]).to_upper(), _local_rank(id)], 11, color))
 	if not compact: details.add_child(_label(str(META[id][2]), 13, ART.TEXT))
 	if not compact: details.add_child(RECORDS.Rule.new())
@@ -286,13 +290,25 @@ func _refresh_details() -> void:
 	var space := Control.new()
 	space.size_flags_vertical = SIZE_EXPAND_FILL
 	details.add_child(space)
-	var price := _label("%d OURO" % PermanentUpgrades.cost(id, SaveManager.data.upgrades) if _can_buy(id) else "", 12 if compact else 16, ART.GOLD, true)
+	var price := _label("%d OURO" % PermanentUpgrades.cost(id, SaveManager.upgrades_for()) if _can_buy(id) else "", 12 if compact else 16, ART.GOLD, true)
 	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	price.visible = _can_buy(id)
 	details.add_child(price)
 	var action := _purchase_button(id, false)
 	action.name = "SelectedUpgradeAction"
-	details.add_child(action)
+	action.size_flags_horizontal = SIZE_EXPAND_FILL
+	var purchases := HBoxContainer.new()
+	details.add_child(purchases)
+	purchases.add_child(action)
+	purchases.add_child(_max_button(id, false))
+
+func purchase_max(id: String) -> bool:
+	if not META.has(id): return false
+	var result: bool = SaveManager.buy_upgrade_max(id)
+	if result: selected_id = id
+	_refresh()
+	if not result: notice.text = "MAX exige ouro para todos os níveis restantes deste patamar."
+	return result
 
 func purchase(id: String) -> bool:
 	if not META.has(id): return false
@@ -302,7 +318,7 @@ func purchase(id: String) -> bool:
 		_refresh()
 	else:
 		_refresh()
-		notice.text = "Melhoria indisponível durante a partida." if GameManager.run_active else ("Complete os outros atributos para abrir o próximo patamar." if not _can_buy(id) else "Faltam %d de ouro." % maxi(0, PermanentUpgrades.cost(id, SaveManager.data.upgrades) - int(SaveManager.data.gold)))
+		notice.text = "Melhoria indisponível durante a partida." if GameManager.run_active else ("Complete os outros atributos para abrir o próximo patamar." if not _can_buy(id) else "Faltam %d de ouro." % maxi(0, PermanentUpgrades.cost(id, SaveManager.upgrades_for()) - int(SaveManager.data.gold)))
 	return result
 
 func set_filter(id: String) -> void:
@@ -346,21 +362,32 @@ func _store() -> void:
 	draft.section = section_index
 
 func _can_buy(id: String) -> bool:
-	return PermanentUpgrades.can_buy(id, SaveManager.data.upgrades)
+	return PermanentUpgrades.can_buy(id, SaveManager.upgrades_for())
 
 func _purchase_button(id: String, on_card: bool) -> Button:
 	var allowed := _can_buy(id)
 	var text := "APRIMORAR ↑" if allowed else ("MÁXIMO" if SaveManager.upgrade_level(id) >= PermanentUpgrades.MAX_RANK else "COMPLETO")
 	if narrow and on_card and allowed: text = "APRIMORAR"
 	var button := _button(text, allowed, 30 if compact else (34 if on_card else 42))
-	button.disabled = not allowed or int(SaveManager.data.gold) < PermanentUpgrades.cost(id, SaveManager.data.upgrades) or GameManager.run_active
-	button.tooltip_text = "Complete os 10 níveis de todos os atributos para abrir o próximo patamar." if not allowed else ("Ouro insuficiente." if button.disabled else "Compra permanente. Bônus acumulativos.")
+	button.disabled = not allowed or int(SaveManager.data.gold) < PermanentUpgrades.cost(id, SaveManager.upgrades_for()) or GameManager.run_active
+	button.tooltip_text = "Complete os 10 níveis de todos os atributos para abrir o próximo patamar." if not allowed else ("Ouro insuficiente." if button.disabled else "Compra permanente apenas para este personagem. Bônus acumulativos.")
 	button.action_font_size = 10 if narrow and on_card else 12
 	button.pressed.connect(purchase.bind(id))
 	return button
 
+func _max_button(id: String, on_card: bool) -> Button:
+	var quote := PermanentUpgrades.max_quote(id, SaveManager.upgrades_for())
+	var button := _button("MAX", true, 30 if compact else (34 if on_card else 42))
+	button.name = ("MaxUpgrade_" if on_card else "SelectedMaxUpgrade_") + id
+	button.custom_minimum_size.x = 40 if on_card else 54
+	button.action_font_size = 10 if on_card else 12
+	button.disabled = int(quote.count) == 0 or int(SaveManager.data.gold) < int(quote.cost) or GameManager.run_active or NetworkSession.running
+	button.tooltip_text = "Comprar %d níveis por %d ouro, até o nível 10 deste patamar. Exige o valor completo." % [int(quote.count), int(quote.cost)]
+	button.pressed.connect(purchase_max.bind(id))
+	return button
+
 func _local_rank(id: String) -> int:
-	return clampi(SaveManager.upgrade_level(id) - PermanentUpgrades.tier(SaveManager.data.upgrades) * 10, 0, 10)
+	return clampi(SaveManager.upgrade_level(id) - PermanentUpgrades.tier(SaveManager.upgrades_for()) * 10, 0, 10)
 
 func _bonus_text(id: String) -> String:
 	var rank: int = SaveManager.upgrade_level(id)

@@ -113,7 +113,7 @@ func _refresh() -> void:
 		name_label.add_theme_font_size_override("font_size", 14)
 		name_label.add_theme_color_override("font_color", Color("#f4ead5"))
 		info.add_child(name_label)
-		var origin := "CHEFE" if str(entry.get("source", "")) == "boss" else "SUBIDA DE NÍVEL"
+		var origin: String = {"boss": "CHEFE", "miniboss": "BAÚ RAIVOSO"}.get(str(entry.get("source", "")), "SUBIDA DE NÍVEL")
 		var status := "REPETIDO: +100 OURO" if bool(entry.get("duplicate", false)) else "ADICIONADO AO ARSENAL"
 		var details := Label.new()
 		details.text = "%s  ·  %s  ·  %s" % [TIERS.label(str(item.rarity)).to_upper(), origin, status]

@@ -10,12 +10,12 @@ func run(tree: SceneTree) -> void:
 	save._initialize_progression(false)
 	save.data.gold = 100000000
 	for stage in PermanentUpgrades.RATES.size():
-		assert(PermanentUpgrades.tier(save.data.upgrades) == stage)
+		assert(PermanentUpgrades.tier(save.upgrades_for()) == stage)
 		for id in PermanentUpgrades.IDS:
 			for step in 10:
 				var rank: int = save.upgrade_level(id)
 				var expected := PermanentUpgrades.bonus(rank) + float(PermanentUpgrades.RATES[stage])
-				var cost := PermanentUpgrades.cost(id, save.data.upgrades)
+				var cost := PermanentUpgrades.cost(id, save.upgrades_for())
 				var gold: int = save.data.gold
 				assert(save.buy_upgrade(id, -999999), "Displayed prices never override the real price")
 				assert(int(save.data.gold) == gold - cost)
@@ -24,10 +24,10 @@ func run(tree: SceneTree) -> void:
 				var gold: int = save.data.gold
 				assert(not save.buy_upgrade(id, 0), "No attribute can skip ahead of the collective tier")
 				assert(int(save.data.gold) == gold)
-	assert(PermanentUpgrades.progress(save.data.upgrades) == 80)
-	assert(is_equal_approx(PermanentUpgrades.bonus(10), 0.01))
-	assert(is_equal_approx(PermanentUpgrades.bonus(20), 0.06))
-	assert(is_equal_approx(PermanentUpgrades.bonus(30), 0.16))
+	assert(PermanentUpgrades.progress(save.upgrades_for()) == 80)
+	assert(is_equal_approx(PermanentUpgrades.bonus(10), 0.002))
+	assert(is_equal_approx(PermanentUpgrades.bonus(20), 0.005))
+	assert(is_equal_approx(PermanentUpgrades.bonus(30), 0.01))
 	for id in ["resilience", "crit_mastery"]:
 		var last := 0.0
 		for rank in range(1, 71):
@@ -37,24 +37,24 @@ func run(tree: SceneTree) -> void:
 	assert(not save.buy_upgrade("invalid", 0))
 	save.load_game()
 	for id in PermanentUpgrades.IDS: assert(save.upgrade_level(id) == 70)
-	save.data.upgrades = save.DEFAULT_SAVE.upgrades.duplicate()
+	save.character_meta().upgrades = save.DEFAULT_SAVE.upgrades.duplicate()
 	var player := SurvivorPlayer.new()
 	player.configure("warrior", {})
 	var base_hp := player.max_health
 	var base_damage := player.damage
 	var base_speed := player.move_speed
 	var base_cooldown := player.attack_cooldown
-	for id in PermanentUpgrades.IDS: save.data.upgrades[id] = 1
+	for id in PermanentUpgrades.IDS: save.upgrades_for()[id] = 1
 	player.configure("warrior", {})
-	assert(is_equal_approx(player.max_health / base_hp, 1.001))
-	assert(is_equal_approx(player.damage / base_damage, 1.001))
-	assert(is_equal_approx(player.move_speed / base_speed, 1.001))
-	assert(is_equal_approx(base_cooldown / player.attack_cooldown, 1.001))
-	assert(is_equal_approx(player.bonus_gold_xp, 0.001) and is_equal_approx(player.bonus_xp_only, 0.001))
+	assert(is_equal_approx(player.max_health / base_hp, 1.0002))
+	assert(is_equal_approx(player.damage / base_damage, 1.0002))
+	assert(is_equal_approx(player.move_speed / base_speed, 1.0002))
+	assert(is_equal_approx(base_cooldown / player.attack_cooldown, 1.0002))
+	assert(is_equal_approx(player.bonus_gold_xp, 0.0002) and is_equal_approx(player.bonus_xp_only, 0.0002))
 	player.take_damage(100.0, true)
-	assert(is_equal_approx(player.max_health - player.health, 99.9))
+	assert(is_equal_approx(player.max_health - player.health, 99.98))
 	player.free()
-	print("PASS: 560 mastery purchases, collective tier gates, canonical prices, persistence and actual 0.1% combat bonuses")
+	print("PASS: 560 mastery purchases, collective tier gates, canonical prices, persistence and actual 0.02% character combat bonuses")
 	_test_powers()
 	await _test_sovereigns(tree)
 	await _test_icons(tree, save)

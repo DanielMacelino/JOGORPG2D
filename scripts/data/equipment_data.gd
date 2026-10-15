@@ -16,6 +16,12 @@ class_name EquipmentData
 @export var tier_index := 0
 @export var required_difficulty := 0
 @export var generated := false
+@export var visual_column := -1
+@export var visual_row := -1
+@export var shield_visual_column := -1
+@export var shield_visual_row := -1
+@export var weapon_kind: StringName = &""
+@export var accessory_visual := -1
 
 ## Comparable item budget, including base attributes and special effects.
 ## This is an ordering aid, not a DPS estimate for every build.

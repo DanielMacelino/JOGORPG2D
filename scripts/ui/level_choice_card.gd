@@ -61,10 +61,10 @@ func _build_text() -> void:
 	if fit_to_slot: title.add_theme_font_override("font", serif_font)
 	content.add_child(title)
 	var tag := "NÍVEL %d → %d" % [current_rank, current_rank + 1]
-	var scope := ("PODER" if ability.active_power else "PASSIVO") + (" GERAL" if ability.class_ids.is_empty() else " DE CLASSE")
+	var scope := ("PODER" if ability.active_power else "PASSIVO") + " · " + ability.combat_label() + (" GERAL" if ability.class_ids.is_empty() else " DE CLASSE")
 	var rarity_line := "◆  %s  ·  %s  ·  %s" % [_rarity_name(str(ability.rarity)).to_upper(), tag, scope]
 	if fit_to_slot:
-		rarity_line = "%s · %s · %s" % [tag, _rarity_name(str(ability.rarity)), "PODER" if ability.active_power else "PASSIVO"]
+		rarity_line = "%s · %s · %s %s" % [tag, _rarity_name(str(ability.rarity)), "PODER" if ability.active_power else "PASSIVO", ability.combat_label()]
 	content.add_child(_make_label(rarity_line, detail_size, accent))
 	content.add_child(_make_label(ability.rank_description(current_rank + 1), body_size, STYLE.TEXT))
 	content.minimum_size_changed.connect(_fit_text_height)
@@ -86,6 +86,17 @@ func _fit_slot() -> void:
 	if fitted_size == size and is_equal_approx(fitted_preference, preferred):
 		return
 	fitting = true
+	var width := get_viewport_rect().size.x
+	var short_row := size.y < 90
+	var full_description := ability.rank_description(current_rank + 1)
+	var description_lines := full_description.split("\n", false)
+	# Very low windows keep the actual next-rank totals visible; full explanation stays on hover.
+	text_content.get_child(2).text = description_lines[description_lines.size() - 1] if short_row and description_lines.size() > 1 else full_description
+	tooltip_text = ability.display_name + "\n" + full_description
+	text_content.add_theme_constant_override("separation", 2 if short_row else (4 if width < 880 else 6))
+	text_content.get_child(0).add_theme_font_size_override("font_size", 16 if short_row else (18 if width < 760 else 23))
+	text_content.get_child(1).add_theme_font_size_override("font_size", 9 if short_row else (10 if width < 520 else (11 if width < 880 else 12)))
+	text_content.get_child(2).add_theme_font_size_override("font_size", 12 if short_row else (13 if width < 520 else 14))
 	var vertical := size.y >= 300 and size.x < 500
 	vertical_card = vertical
 	var compact := size.y < 170

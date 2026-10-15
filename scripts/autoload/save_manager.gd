@@ -3,7 +3,13 @@ extends Node
 signal progression_changed
 
 const SAVE_PATH := "user://ashenwild_save.json"
+const CHARACTER_META := preload("res://scripts/data/character_meta.gd")
+const INVENTORIES := preload("res://scripts/data/character_inventory.gd")
 const DEFAULT_SAVE := {
+	"character_inventory_schema": 1,
+	"character_meta_schema": 1,
+	"character_meta": {},
+	"character_upgrade_refund": 0,
 	"gold": 0,
 	"crystals": 0,
 	"unlocked_classes": ["warrior", "mage", "ranger"],
@@ -21,6 +27,8 @@ const DEFAULT_SAVE := {
 	"last_account_xp_gained": 0,
 	"equipment": ["field_blade", "moon_staff", "thorn_bow"],
 	"equipment_quantities": {},
+	"favorite_equipment": [],
+	"equipment_drop_receipts": {},
 	"transmutation": {"attempts": {}, "failures": {}, "last_result": {}},
 	"equipment_exchange": {"sold": 0, "gold": 0, "crystals": 0, "last_receipt": {}},
 	"equipped": {"weapon": "field_blade"},
@@ -77,15 +85,18 @@ func load_game() -> void:
 		return
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	var migrate_legacy := true
+	var migrate_character_meta := false
+	var migrate_inventory := false
 	if parsed is Dictionary:
 		_merge_defaults(data, parsed)
+		data.character_meta_schema = int(parsed.get("character_meta_schema", 0))
+		data.character_inventory_schema = int(parsed.get("character_inventory_schema", 0))
+		migrate_inventory = int(data.character_inventory_schema) < 1
+		migrate_character_meta = int(data.character_meta_schema) < 1
 		data.talent_schema = int(parsed.get("talent_schema", 0))
 		migrate_legacy = int(parsed.get("progression_version", 0)) < 1
 		if not parsed.has("class_loadouts") and parsed.get("equipped", {}) is Dictionary:
 			data.class_loadouts.warrior = parsed.get("equipped", {}).duplicate(true)
-	for starter in ["field_blade", "moon_staff", "thorn_bow"]:
-		if not data.equipment.has(starter):
-			data.equipment.append(starter)
 	data.selected_class = str(data.get("selected_class", "warrior"))
 	var loadouts: Dictionary = data.get("class_loadouts", {})
 	for class_id in ["warrior", "mage", "ranger"]:
@@ -99,7 +110,10 @@ func load_game() -> void:
 	for k in default_upgrades:
 		if not data.upgrades.has(k):
 			data.upgrades[k] = 0
-	save_game()
+	if migrate_character_meta or migrate_inventory:
+		_commit_inventory_transaction(data)
+	else:
+		save_game()
 
 func reset_progress() -> Error:
 	if GameManager.run_active or NetworkSession.running:
@@ -135,6 +149,7 @@ func _merge_defaults(target: Dictionary, source: Dictionary) -> void:
 			target[key] = source[key]
 
 func save_game() -> void:
+	INVENTORIES.capture(data)
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data, "\t"))
@@ -168,32 +183,86 @@ func spend_crystals(amount: int) -> bool:
 # UPGRADES PERMANENTES
 # ═══════════════════════════════════════════════
 func buy_upgrade(upgrade_id: String, _displayed_price: int = -1) -> bool:
-	if GameManager.run_active or not PermanentUpgrades.can_buy(upgrade_id, data.upgrades):
+	var levels := upgrades_for()
+	if GameManager.run_active or NetworkSession.running or not PermanentUpgrades.can_buy(upgrade_id, levels):
 		return false
-	var price := PermanentUpgrades.cost(upgrade_id, data.upgrades)
+	var price := PermanentUpgrades.cost(upgrade_id, levels)
 	if int(data.gold) < price:
 		return false
-	data.gold = int(data.gold) - price
-	data.upgrades[upgrade_id] = upgrade_level(upgrade_id) + 1
-	save_game()
-	return true
+	var updated := data.duplicate(true)
+	updated.gold = int(updated.gold) - price
+	CHARACTER_META.profile(updated, str(data.selected_class)).upgrades[upgrade_id] = int(levels.get(upgrade_id, 0)) + 1
+	return _commit_inventory_transaction(updated) == OK
 
-func upgrade_level(id: String) -> int:
-	return int(data.upgrades.get(id, 0))
+func buy_upgrade_max(upgrade_id: String) -> bool:
+	if GameManager.run_active or NetworkSession.running: return false
+	var quote := PermanentUpgrades.max_quote(upgrade_id, upgrades_for())
+	if int(quote.count) == 0 or int(data.gold) < int(quote.cost): return false
+	var updated := data.duplicate(true)
+	updated.gold = int(updated.gold) - int(quote.cost)
+	CHARACTER_META.profile(updated, str(data.selected_class)).upgrades[upgrade_id] = int(quote.target)
+	return _commit_inventory_transaction(updated) == OK
+
+func character_meta(class_id: String = "") -> Dictionary:
+	return CHARACTER_META.profile(data, class_id if not class_id.is_empty() else str(data.selected_class))
+
+func upgrades_for(class_id: String = "") -> Dictionary:
+	return character_meta(class_id).upgrades
+
+func upgrade_level(id: String, class_id: String = "") -> int:
+	return int(upgrades_for(class_id).get(id, 0))
 
 # ═══════════════════════════════════════════════
 # EQUIPAMENTOS
 # ═══════════════════════════════════════════════
-func unlock_equipment(item_id: String) -> void:
-	if not data.equipment.has(item_id):
-		data.equipment.append(item_id)
-		data.equipment_quantities[item_id] = 1
+func inventory_for(class_id: String = "") -> Dictionary:
+	return INVENTORIES.view(data, class_id if not class_id.is_empty() else str(data.selected_class))
+
+func owned_equipment(class_id: String = "") -> Array:
+	return inventory_for(class_id).get("equipment", [])
+
+func unlock_equipment(item_id: String, class_id: String = "") -> void:
+	var item: EquipmentData = ContentCatalog.equipment.get(item_id)
+	if item == null: return
+	var owner := class_id if not class_id.is_empty() else (str(item.class_id) if item.class_id != &"" else str(data.selected_class))
+	if not ContentCatalog.classes.has(owner): return
+	if item.class_id != &"" and str(item.class_id) != owner: return
+	var inventory := inventory_for(owner)
+	if not inventory.equipment.has(item_id):
+		TransmutationRules.add_copy(inventory, item_id)
 		save_game()
 
-func equipment_quantity(id: String) -> int:
-	return TransmutationRules.quantity(data, id)
+func equipment_quantity(id: String, class_id: String = "") -> int:
+	return TransmutationRules.quantity(inventory_for(class_id), id)
+
+func grant_equipment_drop(item_id: String, receipt: String, class_id: String = "") -> Error:
+	if not ContentCatalog.equipment.has(item_id) or receipt.is_empty(): return ERR_INVALID_PARAMETER
+	var owner := class_id if not class_id.is_empty() else str(data.selected_class)
+	if not ContentCatalog.classes.has(owner): return ERR_INVALID_PARAMETER
+	var item: EquipmentData = ContentCatalog.equipment[item_id]
+	if item.class_id != &"" and str(item.class_id) != owner: return ERR_INVALID_PARAMETER
+	if data.get("equipment_drop_receipts", {}).has(receipt): return OK
+	var updated := data.duplicate(true)
+	if not updated.has("equipment_drop_receipts"): updated.equipment_drop_receipts = {}
+	TransmutationRules.add_copy(INVENTORIES.view(updated, owner), item_id)
+	updated.equipment_drop_receipts[receipt] = item_id
+	while updated.equipment_drop_receipts.size() > 256:
+		updated.equipment_drop_receipts.erase(updated.equipment_drop_receipts.keys()[0])
+	return _commit_inventory_transaction(updated)
+
+func is_equipment_favorite(id: String) -> bool:
+	return data.get("favorite_equipment", []).has(id)
+
+func set_equipment_favorite(id: String, enabled: bool) -> bool:
+	if not data.equipment.has(id): return false
+	if not data.has("favorite_equipment"): data.favorite_equipment = []
+	if enabled and not data.favorite_equipment.has(id): data.favorite_equipment.append(id)
+	elif not enabled: data.favorite_equipment.erase(id)
+	save_game()
+	return true
 
 func transmute_equipment(inputs: Array, owner: String) -> Dictionary:
+	if owner != str(data.selected_class): return {"ok": false, "reason": "Selecione este personagem antes de fundir seus itens."}
 	if GameManager.run_active or NetworkSession.running:
 		return {"ok": false, "reason": "A fusão não pode ser usada durante uma partida."}
 	var rng := RandomNumberGenerator.new()
@@ -205,7 +274,19 @@ func transmute_equipment(inputs: Array, owner: String) -> Dictionary:
 		return {"ok": false, "reason": "Não foi possível salvar a fusão. Seus itens foram preservados."}
 	return {"ok": true, "result": transaction.result.duplicate(true)}
 
+func wager_equipment(target: String, inputs: Array, owner: String) -> Dictionary:
+	if owner != str(data.selected_class): return {"ok": false, "reason": "Selecione este personagem antes de apostar."}
+	if GameManager.run_active or NetworkSession.running: return {"ok": false, "reason": "Apostas não podem ser realizadas durante uma partida."}
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var transaction := EquipmentWager.resolve(data, target, inputs, owner, rng)
+	if not bool(transaction.ok): return transaction
+	if _commit_inventory_transaction(transaction.save) != OK:
+		return {"ok": false, "reason": "Não foi possível salvar. Seus equipamentos foram preservados."}
+	return {"ok": true, "result": transaction.result.duplicate(true)}
+
 func exchange_equipment(id: String, amount: int, owner: String) -> Dictionary:
+	if owner != str(data.selected_class): return {"ok": false, "reason": "Selecione este personagem antes de trocar seus itens."}
 	if GameManager.run_active or NetworkSession.running:
 		return {"ok": false, "reason": "Trocas não podem ser realizadas durante uma partida."}
 	var transaction := EquipmentExchange.resolve(data, id, amount, owner)
@@ -221,6 +302,7 @@ func acknowledge_transmutation() -> Error:
 	return _commit_inventory_transaction(updated)
 
 func _commit_inventory_transaction(updated: Dictionary) -> Error:
+	INVENTORIES.capture(updated)
 	var temporary := SAVE_PATH + ".inventory_tmp"
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null: return FileAccess.get_open_error()
@@ -242,7 +324,9 @@ func set_selected_class(class_id: String) -> void:
 		return
 	if not data.class_loadouts.has(class_id):
 		data.class_loadouts[class_id] = {}
+	INVENTORIES.capture(data)
 	data.selected_class = class_id
+	INVENTORIES.activate(data, class_id)
 	data.equipped = data.class_loadouts[class_id].duplicate(true)
 	save_game()
 
@@ -252,8 +336,10 @@ func loadout_for(class_id: String) -> Dictionary:
 	return loadout if loadout is Dictionary else {}
 
 func equip_item(slot: String, item_id: String, class_id: String = "") -> void:
-	if data.equipment.has(item_id):
-		var target_class := class_id if not class_id.is_empty() else str(data.get("selected_class", "warrior"))
+	var target_class := class_id if not class_id.is_empty() else str(data.get("selected_class", "warrior"))
+	var item: EquipmentData = ContentCatalog.equipment.get(item_id)
+	if item == null or str(item.slot) != slot or (item.class_id != &"" and str(item.class_id) != target_class): return
+	if equipment_quantity(item_id, target_class) > 0:
 		if not is_class_unlocked(target_class):
 			return
 		var loadouts: Dictionary = data.get("class_loadouts", {})
@@ -268,96 +354,98 @@ func equip_item(slot: String, item_id: String, class_id: String = "") -> void:
 # ═══════════════════════════════════════════════
 # RELÍQUIAS
 # ═══════════════════════════════════════════════
-func unlock_relic(relic_id: String) -> void:
-	var relics: Array = data.get("relics", [])
+func unlock_relic(relic_id: String, class_id: String = "") -> void:
+	if ContentCatalog.get_relic(relic_id).is_empty(): return
+	var relics: Array = character_meta(class_id).relics
 	if not relics.has(relic_id):
 		relics.append(relic_id)
-		data.relics = relics
 		save_game()
 
-func equip_relic(relic_id: String) -> bool:
-	if not data.relics.has(relic_id):
+func equip_relic(relic_id: String, class_id: String = "") -> bool:
+	if GameManager.run_active or NetworkSession.running: return false
+	var owner := class_id if not class_id.is_empty() else str(data.selected_class)
+	if not is_class_unlocked(owner) or not has_relic(relic_id, owner):
 		return false
-	var equipped: Array = data.get("equipped_relics", [])
+	var equipped: Array = character_meta(owner).equipped_relics
 	if equipped.has(relic_id):
 		return false
 	if equipped.size() >= 3:  # Max 3 relíquias equipadas
 		return false
-	equipped.append(relic_id)
-	data.equipped_relics = equipped
-	save_game()
-	return true
+	var updated := data.duplicate(true)
+	CHARACTER_META.profile(updated, owner).equipped_relics.append(relic_id)
+	return _commit_inventory_transaction(updated) == OK
 
-func unequip_relic(relic_id: String) -> void:
-	var equipped: Array = data.get("equipped_relics", [])
-	equipped.erase(relic_id)
-	data.equipped_relics = equipped
-	save_game()
+func unequip_relic(relic_id: String, class_id: String = "") -> void:
+	if GameManager.run_active or NetworkSession.running: return
+	var owner := class_id if not class_id.is_empty() else str(data.selected_class)
+	var updated := data.duplicate(true)
+	CHARACTER_META.profile(updated, owner).equipped_relics.erase(relic_id)
+	_commit_inventory_transaction(updated)
 
-func has_relic(relic_id: String) -> bool:
-	return data.get("relics", []).has(relic_id)
+func has_relic(relic_id: String, class_id: String = "") -> bool:
+	return character_meta(class_id).relics.has(relic_id)
 
-func is_relic_equipped(relic_id: String) -> bool:
-	return data.get("equipped_relics", []).has(relic_id)
+func is_relic_equipped(relic_id: String, class_id: String = "") -> bool:
+	return get_equipped_relics(class_id).has(relic_id)
 
-func get_equipped_relics() -> Array:
-	return data.get("equipped_relics", [])
+func get_equipped_relics(class_id: String = "") -> Array:
+	return character_meta(class_id).equipped_relics.duplicate()
 
 # ═══════════════════════════════════════════════
 # FORJA
 # ═══════════════════════════════════════════════
 func forge_item(recipe_id: String) -> bool:
 	var recipe: Dictionary = ContentCatalog.get_forge_recipe(recipe_id)
-	if recipe.is_empty():
-		return false
 	if not can_forge(recipe_id): return false
-	# Verificar se tem os itens
-	for ing in recipe.get("ingredients", []):
-		if equipment_quantity(str(ing.id)) < int(ing.get("qty", 1)):
-			return false
-	# Verificar custos
-	if int(data.get("crystals", 0)) < int(recipe.get("crystal_cost", 0)):
-		return false
-	if int(data.get("gold", 0)) < int(recipe.get("gold_cost", 0)):
-		return false
-	# Remover ingredientes (apenas os não básicos de starter)
+	# Consume and deliver on a copy, then commit once. Existing results gain a real copy.
+	var updated := data.duplicate(true)
 	var starters := _starter_weapons()
-	for ing in recipe.get("ingredients", []):
-		if not starters.has(ing.id):
-			TransmutationRules.consume(data, str(ing.id), int(ing.get("qty", 1)))
+	var required := _forge_ingredients(recipe)
+	for ingredient_id in required:
+		if not starters.has(ingredient_id):
+			TransmutationRules.consume(updated, ingredient_id, int(required[ingredient_id]))
+	TransmutationRules.add_copy(updated, str(recipe.result))
 	var result_item: EquipmentData = ContentCatalog.equipment.get(str(recipe.result))
-	for owner in data.class_loadouts:
-		var loadout: Dictionary = data.class_loadouts[owner]
+	for owner in [str(updated.selected_class)]:
+		var loadout: Dictionary = updated.class_loadouts[owner]
 		for slot in loadout.keys():
-			if data.equipment.has(str(loadout[slot])): continue
+			if updated.equipment.has(str(loadout[slot])): continue
 			if result_item != null and str(result_item.slot) == str(slot) and (result_item.class_id == &"" or str(result_item.class_id) == str(owner)):
 				loadout[slot] = str(result_item.id)
 			else: loadout.erase(slot)
-	data.equipped = loadout_for(str(data.selected_class)).duplicate(true)
-	# Cobrar
-	data.crystals = int(data.get("crystals", 0)) - int(recipe.get("crystal_cost", 0))
-	data.gold = int(data.get("gold", 0)) - int(recipe.get("gold_cost", 0))
-	# Dar o resultado
-	unlock_equipment(recipe.result)
-	# Registrar na forja
-	var forged: Dictionary = data.get("forge_upgrades", {})
+	updated.equipped = updated.class_loadouts.get(str(updated.selected_class), {}).duplicate(true)
+	updated.crystals = int(updated.get("crystals", 0)) - int(recipe.get("crystal_cost", 0))
+	updated.gold = int(updated.get("gold", 0)) - int(recipe.get("gold_cost", 0))
+	var forged: Dictionary = updated.get("forge_upgrades", {})
 	forged[recipe_id] = int(forged.get(recipe_id, 0)) + 1
-	data.forge_upgrades = forged
-	save_game()
-	# Verificar conquistas de forja
+	updated.forge_upgrades = forged
+	if _commit_inventory_transaction(updated) != OK: return false
 	_check_forge_achievements()
 	return true
 
+func _forge_ingredients(recipe: Dictionary) -> Dictionary:
+	var required := {}
+	for ingredient in recipe.get("ingredients", []):
+		var id := str(ingredient.id)
+		required[id] = int(required.get(id, 0)) + maxi(1, int(ingredient.get("qty", 1)))
+	return required
+
 func can_forge(recipe_id: String) -> bool:
+	if GameManager.run_active or NetworkSession.running: return false
 	var recipe: Dictionary = ContentCatalog.get_forge_recipe(recipe_id)
-	if recipe.is_empty():
+	if recipe.is_empty() or not ContentCatalog.equipment.has(str(recipe.get("result", ""))):
 		return false
+	var result_item: EquipmentData = ContentCatalog.equipment[str(recipe.result)]
+	if result_item.class_id != &"" and str(result_item.class_id) != str(data.selected_class): return false
+	if is_equipment_favorite(str(recipe.result)): return false
+	for ingredient in recipe.get("ingredients", []):
+		if is_equipment_favorite(str(ingredient.id)): return false
 	if bool(recipe.get("generated", false)):
 		var item: EquipmentData = ContentCatalog.equipment.get(str(recipe.result))
 		if item == null or not is_class_unlocked(str(item.class_id)) or int(data.highest_difficulty) < item.required_difficulty or not phase_unlocked(str(item.region_id), 1, item.required_difficulty): return false
-		if int(data.forge_upgrades.get(recipe_id, 0)) > 0 or data.equipment.has(str(recipe.result)): return false
-	for ing in recipe.get("ingredients", []):
-		if equipment_quantity(str(ing.id)) < int(ing.get("qty", 1)):
+	var required := _forge_ingredients(recipe)
+	for id in required:
+		if equipment_quantity(str(id)) < int(required[id]):
 			return false
 	if int(data.get("crystals", 0)) < int(recipe.get("crystal_cost", 0)):
 		return false
@@ -438,8 +526,7 @@ func unlock_achievement(achievement_id: String) -> bool:
 				data.gold = int(data.get("gold", 0)) + int(ach.reward_gold)
 			if int(ach.get("reward_crystals", 0)) > 0:
 				data.crystals = int(data.get("crystals", 0)) + int(ach.reward_crystals)
-			if not str(ach.get("reward_relic", "")).is_empty():
-				unlock_relic(str(ach.reward_relic))
+			# Relics follow this character's own challenges, independent of account achievements.
 			break
 	save_game()
 	return true
@@ -453,7 +540,7 @@ func get_achievement_count() -> int:
 # ═══════════════════════════════════════════════
 # ESTATÍSTICAS
 # ═══════════════════════════════════════════════
-func record_run(wave: int, gold_earned: int, playtime: float = 0.0, kills: int = 0, class_id: String = "", bosses: int = 0, elites: int = 0, damage: float = 0.0, victory: bool = false, xp_multiplier: float = 1.0) -> void:
+func record_run(wave: int, gold_earned: int, playtime: float = 0.0, kills: int = 0, class_id: String = "", bosses: int = 0, elites: int = 0, damage: float = 0.0, victory: bool = false, xp_multiplier: float = 1.0, skill_count: int = 0) -> void:
 	data.gold = int(data.get("gold", 0)) + gold_earned
 	data.best_wave = maxi(int(data.get("best_wave", 0)), wave)
 
@@ -489,6 +576,15 @@ func record_run(wave: int, gold_earned: int, playtime: float = 0.0, kills: int =
 	var progress: Dictionary = data.class_progression[target_class]
 	progress.xp = int(progress.xp) + earned_xp
 	progress.last_xp = earned_xp
+	var meta := character_meta(target_class)
+	var challenges: Dictionary = meta.relic_progress
+	challenges.kills += maxi(0, kills)
+	challenges.bosses += maxi(0, bosses)
+	challenges.elites += maxi(0, elites)
+	challenges.gold += maxi(0, gold_earned)
+	challenges.waves += maxi(0, wave - 1) + (1 if victory else 0)
+	challenges.skills = maxi(int(challenges.skills), skill_count)
+	CHARACTER_META.award_relics(meta)
 	_check_run_achievements(wave, kills, class_id, bosses)
 	save_game()
 	progression_changed.emit()
@@ -541,10 +637,12 @@ func _check_beast_hunter() -> void:
 			return
 	unlock_achievement("beast_hunter")
 
-func record_kill(enemy_id: String) -> void:
+func record_kill(enemy_id: String, class_id: String = "") -> void:
 	var bestiary: Dictionary = data.get("bestiary_kills", {})
 	bestiary[enemy_id] = int(bestiary.get(enemy_id, 0)) + 1
 	data.bestiary_kills = bestiary
+	var species: Dictionary = character_meta(class_id).relic_progress.species
+	species[enemy_id] = int(species.get(enemy_id, 0)) + 1
 
 	# Bounties
 	record_bounty_kill(enemy_id)
@@ -590,8 +688,6 @@ func _initialize_progression(migrate_legacy: bool) -> void:
 			var class_data: Resource = ContentCatalog.classes.get(class_id)
 			var starter := str(class_data.starter_weapon)
 			if not starter.is_empty() and ContentCatalog.equipment.has(starter):
-				if not data.equipment.has(starter):
-					data.equipment.append(starter)
 				if loadouts[class_id].is_empty():
 					loadouts[class_id] = {"weapon": starter}
 		for key in ["class_runs", "class_best_wave", "damage_by_class"]:
@@ -633,6 +729,8 @@ func _initialize_progression(migrate_legacy: bool) -> void:
 	data.selected_difficulty = clampi(int(data.get("selected_difficulty", 0)), 0, int(data.highest_difficulty))
 	data.selected_phase = clampi(int(data.get("selected_phase", 1)), 1, 10)
 	data.progression_version = 2
+	CHARACTER_META.initialize(data)
+	INVENTORIES.initialize(data)
 
 func _starter_weapons() -> Array:
 	var starters: Array = []
@@ -660,8 +758,8 @@ func unlock_class(class_id: String, currency: String = "gold") -> bool:
 	data.unlocked_classes.append(class_id)
 	var starter := str(class_data.starter_weapon)
 	if not starter.is_empty() and ContentCatalog.equipment.has(starter):
-		if not data.equipment.has(starter):
-			data.equipment.append(starter)
+		if equipment_quantity(starter, class_id) < 1:
+			TransmutationRules.add_copy(inventory_for(class_id), starter)
 		data.class_loadouts[class_id] = {"weapon": starter}
 	save_game()
 	progression_changed.emit()
@@ -685,7 +783,7 @@ func phase_completed(map_id: String, phase: int, tier: int) -> bool:
 	var index := CampaignRules.ordinal(map_id, phase)
 	return index >= 0 and tier >= 0 and index < campaign_cleared(tier)
 
-func complete_phase(map_id: String, phase: int, tier: int) -> bool:
+func complete_phase(map_id: String, phase: int, tier: int, class_id: String = "") -> bool:
 	if not phase_unlocked(map_id, phase, tier):
 		return false
 	var cleared := maxi(campaign_cleared(tier), CampaignRules.ordinal(map_id, phase) + 1)
@@ -697,6 +795,9 @@ func complete_phase(map_id: String, phase: int, tier: int) -> bool:
 		unlock_achievement("legend")
 	if phase == CampaignRules.PHASES_PER_REGION:
 		_mark_region_completed(map_id)
+		var meta := character_meta(class_id)
+		if not meta.relic_progress.regions.has(map_id): meta.relic_progress.regions.append(map_id)
+		CHARACTER_META.award_relics(meta)
 	save_game()
 	progression_changed.emit()
 	return true

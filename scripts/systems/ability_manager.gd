@@ -41,6 +41,10 @@ func active_power_count() -> int:
 	return count
 
 func can_learn(ability: AbilityData) -> bool:
+	if not ability.school_id.is_empty():
+		for id in levels:
+			var learned: AbilityData = ContentCatalog.abilities.get(str(id))
+			if learned != null and learned.school_id == ability.school_id and learned.id != ability.id: return false
 	return not ability.active_power or ability.id == innate_ability or level_of(ability.id) > 0 or active_power_count() < MAX_ACTIVE_POWERS
 
 func chooseable() -> Array[StringName]:
@@ -87,7 +91,8 @@ func _get_weight(id: StringName) -> float:
 		&"legendary": base = 0.055
 		&"demigod": base = 0.025
 		&"divine": base = 0.010
-	return base * (1.25 if level_of(id) > 0 else 1.0)
+	# The expanded catalog must not drown out the character's original identity.
+	return base * (1.6 if level_of(id) > 0 else 1.0) * (1.0 if ability.school_id.is_empty() else 0.45)
 
 func roll_choices(count: int = 3) -> Array[AbilityData]:
 	var pool := chooseable()
@@ -99,6 +104,14 @@ func roll_choices(count: int = 3) -> Array[AbilityData]:
 			for id in pool:
 				if ContentCatalog.abilities[str(id)].active_power:
 					selection.append(id)
+		elif result.size() == 1:
+			for id in pool:
+				var ability: AbilityData = ContentCatalog.abilities[str(id)]
+				if not ability.active_power and not ability.class_ids.is_empty(): selection.append(id)
+		else:
+			for id in pool:
+				var ability: AbilityData = ContentCatalog.abilities[str(id)]
+				if ability.class_ids.is_empty() or level_of(id) > 0: selection.append(id)
 		if selection.is_empty():
 			selection.assign(pool)
 		var total := 0.0
@@ -113,4 +126,8 @@ func roll_choices(count: int = 3) -> Array[AbilityData]:
 				break
 		result.append(ContentCatalog.abilities[str(selected)])
 		pool.erase(selected)
+		var school: String = ContentCatalog.abilities[str(selected)].school_id
+		if not school.is_empty():
+			for id in pool.duplicate():
+				if ContentCatalog.abilities[str(id)].school_id == school: pool.erase(id)
 	return result

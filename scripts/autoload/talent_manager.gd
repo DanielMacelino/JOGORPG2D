@@ -19,7 +19,7 @@ const PROFILES := {
 	"mage": ["Éter", "Véu", "Oráculo", "Supernova", "A cada 10 s, libera uma explosão arcana de grande alcance."],
 	"ranger": ["Espinhos", "Abrigo", "Mira", "Chuva de flechas", "A cada 7 s, dispara cinco flechas perfurantes em leque."],
 	"assassin": ["Lâmina", "Sombra", "Emboscada", "Execução", "A cada 7 s, golpeia até seis inimigos próximos com dano elevado."],
-	"druid": ["Raízes", "Seiva", "Ciclo", "Florescimento ancestral", "A cada 10 s, invoca um ancestral por 18 s, causa dano ao redor e recupera 20% da vida máxima."],
+	"druid": ["Raízes", "Seiva", "Ciclo", "Florescimento ancestral", "A cada 14 s, invoca uma árvore ancestral por 18 s. Ela ataca com raízes à distância. Recupera 15% da vida máxima."],
 	"paladin": ["Sol", "Juramento", "Aurora", "Julgamento", "A cada 9 s, consagra o chão, causa dano e recupera 8% da vida máxima."]
 }
 var nodes: Dictionary = {}

@@ -12,13 +12,13 @@ const BURST := preload("res://scripts/world/burst_effect.gd")
 const SKILL_EFFECT := preload("res://scripts/world/skill_effect.gd")
 const LIGHTNING := preload("res://scripts/world/lightning_arc.gd")
 const FIELDS := {
-	"P": ["health", "max_health", "move_speed", "facing", "is_dead", "revive_progress", "revive_protection", "animation_time", "moving_blend", "attack_time", "attack_duration", "attack_serial", "attack_direction", "attack_critical", "attack_animation_style", "flash", "level"],
+	"P": ["health", "max_health", "move_speed", "facing", "is_dead", "revive_progress", "revive_protection", "animation_time", "moving_blend", "attack_time", "attack_duration", "attack_serial", "attack_direction", "attack_critical", "attack_animation_style", "flash", "level", "attack_special", "death_elapsed"],
 	"E": ["health", "max_health", "hit_flash", "animation_time", "moving_blend", "burn_remaining", "attack_time", "attack_direction", "spawn_time"],
 	"Q": ["direction", "speed", "elapsed", "magic", "color", "player_team", "trail_points"],
 	"D": ["spec", "elapsed", "fired", "shape", "radius"],
 	"A": ["elapsed", "fired", "radius", "duration", "lingering"],
 	"M": ["kind", "health", "max_health", "progress", "complete", "radius"],
-	"C": ["kind", "remaining", "full_duration", "animation_time", "moving_blend", "attack_time", "facing"],
+	"C": ["kind", "remaining", "full_duration", "animation_time", "moving_blend", "attack_time", "facing", "rank", "attack_reach"],
 	"X": ["phase"], "G": ["phase"], "B": ["radius", "color", "elapsed", "lifetime"],
 	"F": ["kind", "radius", "color", "direction", "elapsed", "lifetime"],
 	"L": ["shape_points", "color", "elapsed", "lifetime"]}
@@ -49,6 +49,7 @@ static func capture_players(game: Node) -> Dictionary:
 		var actor: Node = game.actors[id]
 		var row := _row(actor.player, "P", "P%d" % id)
 		row.class_id = actor.player_class
+		row.weapon_id = actor.player.equipped_weapon_id
 		row.peer = id
 		row.ack = int(NetworkSession.acknowledged_inputs.get(id, 0))
 		row.echo = int(NetworkSession.acknowledged_stamps.get(id, 0))
@@ -124,13 +125,13 @@ func apply(packet: Dictionary) -> void:
 			break
 	world._set_boss_music(bool(packet.get("boss_music", false)))
 	world._refresh_skill_list()
-	var team: PackedStringArray = []
+	var team: Array[Dictionary] = []
 	for id in NetworkSession.players:
 		var key := "P%d" % id
 		if visuals.has(key):
 			var unit: SurvivorPlayer = visuals[key]
-			team.append("%s · %s" % [NetworkSession.players[id].name, unit.downed_status() if unit.is_dead else "%d/%d HP" % [unit.health, unit.max_health]])
-	world.team_label.text = "\n".join(team)
+			team.append({"name": NetworkSession.players[id].name, "class_id": str(unit.class_data.id), "health": unit.health, "maximum": unit.max_health, "dead": unit.is_dead, "revive": unit.revive_progress})
+	world.team_label.update_members(team)
 
 func apply_slice(packet: Dictionary, sequence: int) -> void:
 	for row in packet.rows:
@@ -175,6 +176,7 @@ func _apply_row(row: Dictionary) -> void:
 	if fresh:
 		visuals[key] = _create(row)
 	var node: Node2D = visuals[key]
+	if row.type == "P": node.set("equipped_weapon_id", str(row.get("weapon_id", "")))
 	for field in row.v:
 		if node == world.player and field in ["animation_time", "moving_blend", "facing"] and not bool(row.v.get("is_dead", false)):
 			continue
@@ -226,7 +228,7 @@ func _create(row: Dictionary) -> Node2D:
 				node.configure(str(row.class_id), {})
 			node.z_index = 5
 		"E":
-			node = ENEMY.new()
+			node = preload("res://scenes/enemies/pixel_enemy.tscn").instantiate() if preload("res://scripts/data/pixel_enemy_sprites.gd").has_kind(StringName(row.kind)) else ENEMY.new()
 			node.configure(ContentCatalog.enemies[str(row.kind)], world.player, 1)
 			node.z_index = 4 if node.data.boss else 2
 		"Q": node = PROJECTILE.new()
@@ -272,6 +274,8 @@ func _process(delta: float) -> void:
 		if not world.collective_paused and not world.run_finished:
 			if node is SurvivorPlayer:
 				node.attack_time = maxf(0.0, node.attack_time - delta)
+				node.flash = maxf(0.0, node.flash - delta)
+				if node.is_dead: node.death_elapsed += delta
 				if node != world.player:
 					node.animation_time += delta
 			elif node is ChaserEnemy:

@@ -54,4 +54,5 @@ static func expedition(map_id: String, phase: int, tier: int) -> MapData:
 	stage.duration *= 1.20 + float(stage.phase_number - 1) * (0.20 / 9.0)
 	if stage.phase_number == 10:
 		stage.difficulty *= 1.15
+		if map_id == "verdant_reach": stage.boss_id = &"minotaur"
 	return stage

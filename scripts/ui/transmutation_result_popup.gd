@@ -27,15 +27,30 @@ func _ready() -> void:
 	panel.add_theme_stylebox_override("panel", style)
 	fit.content = panel
 	add_child(fit)
+	fit.modulate.a = 0.0
+	create_tween().tween_property(fit, "modulate:a", 1.0, 0.24)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
 	panel.add_child(column)
-	column.add_child(_label("RARIDADE ELEVADA" if bool(result.success) else "RARIDADE MANTIDA", 23, ART.GREEN if bool(result.success) else ART.GOLD))
-	column.add_child(_label("A fusão melhorou a raridade do equipamento." if bool(result.success) else "A raridade não subiu. Você recebeu um item da mesma raridade e avançou seu marco.", 13, ART.TEXT))
-	_item(column, str(result.result_id), "ITEM RECEBIDO")
+	var wager := str(result.get("kind", "fusion")) == "wager"
+	if wager:
+		column.add_child(_label("PRÊMIO CONQUISTADO" if bool(result.success) else "APOSTA NÃO VENCEU", 23, ART.GREEN if bool(result.success) else ART.GOLD))
+		column.add_child(_label("Os sacrifícios se transformaram no equipamento que você escolheu." if bool(result.success) else "Os itens oferecidos foram consumidos. Você recebeu a consolação indicada antes da aposta.", 13, ART.TEXT))
+		if bool(result.success): _item(column, str(result.result_id), "ITEM RECEBIDO")
+		else:
+			var parts: Array[String] = []
+			var consolation: Dictionary = result.get("consolation", {})
+			if int(consolation.get("gold", 0)) > 0: parts.append("%d OURO" % consolation.gold)
+			if int(consolation.get("crystals", 0)) > 0: parts.append("%d CRISTAL(IS)" % consolation.crystals)
+			column.add_child(_label("CONSOLAÇÃO · " + " + ".join(parts), 19, ART.GOLD))
+			column.add_child(_label("O prêmio desejado não foi obtido. A consolação já foi salva.", 12, ART.MUTED))
+	else:
+		column.add_child(_label("RARIDADE ELEVADA" if bool(result.success) else "RARIDADE MANTIDA", 23, ART.GREEN if bool(result.success) else ART.GOLD))
+		column.add_child(_label("A fusão melhorou a raridade do equipamento." if bool(result.success) else "A raridade não subiu. Você recebeu um item da mesma raridade e avançou seu marco.", 13, ART.TEXT))
+		_item(column, str(result.result_id), "ITEM RECEBIDO")
 	if not str(result.bonus_id).is_empty():
 		_item(column, str(result.bonus_id), "MARCO ATINGIDO · ITEM EXTRA")
-	column.add_child(_label("Os equipamentos já foram salvos no inventário.", 12, ART.MUTED))
+	column.add_child(_label("O resultado já foi salvo." if wager else "Os equipamentos já foram salvos no inventário.", 12, ART.MUTED))
 	error_label = _label("", 12, Color("#ffb5a8"))
 	error_label.hide()
 	column.add_child(error_label)

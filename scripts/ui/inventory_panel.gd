@@ -335,6 +335,19 @@ func _add_item(item: EquipmentData) -> void:
 		mark.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 		mark.position = Vector2(-20, 2)
 		button.add_child(mark)
+	var favorite := Button.new()
+	favorite.name = "Favorite_" + str(item.id)
+	favorite.text = "★" if SaveManager.is_equipment_favorite(str(item.id)) else "☆"
+	favorite.position = Vector2(2, 2)
+	favorite.custom_minimum_size = Vector2(24, 24)
+	favorite.add_theme_font_size_override("font_size", 18)
+	favorite.add_theme_color_override("font_color", ART.GOLD)
+	for state in ["normal", "hover", "pressed"]: favorite.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	favorite.tooltip_text = "Desfavoritar" if SaveManager.is_equipment_favorite(str(item.id)) else "Favoritar: protege todas as cópias na Forja, Trocas e Transmutação."
+	favorite.pressed.connect(func() -> void:
+		SaveManager.set_equipment_favorite(str(item.id), not SaveManager.is_equipment_favorite(str(item.id)))
+		_refresh_items())
+	button.add_child(favorite)
 
 class ItemButton extends Button:
 	func _make_custom_tooltip(for_text: String) -> Object:

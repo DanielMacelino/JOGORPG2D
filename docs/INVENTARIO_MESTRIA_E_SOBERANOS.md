@@ -4,17 +4,17 @@ O Arsenal mostra os itens em uma grade de ícones, com filtro por espaço e pagi
 
 ## Melhorias permanentes
 
-Oito atributos compartilham sete patamares. Cada atributo recebe dez compras em cada patamar. Nenhum pode avançar antes que os outros sete terminem os dez passos atuais. As compras anteriores ficam registradas, com os bônus recalculados para o novo ritmo; não há reset de ouro, equipamentos ou talentos.
+Cada personagem tem oito atributos com sete patamares individuais. Cada atributo recebe dez compras por patamar; os outros sete precisam concluir seus passos antes do próximo patamar. As compras universais anteriores são reiniciadas e o ouro é reembolsado uma vez. Veja `PERSONAGENS_E_NATUREZA.md` para a migração.
 
 | Patamar | Bônus de cada compra | Bônus acumulado ao completar o atributo |
 | --- | --- | --- |
-| Aprendiz | 0,1% | 1% |
-| Iniciado | 0,5% | 6% |
-| Veterano | 1% | 16% |
-| Mestre | 1,5% | 31% |
-| Ascendente | 2% | 51% |
-| Semideus | 2,5% | 76% |
-| Divino | 3% | 106% |
+| Aprendiz | 0,02% | 0,2% |
+| Iniciado | 0,03% | 0,5% |
+| Veterano | 0,05% | 1% |
+| Mestre | 0,07% | 1,7% |
+| Ascendente | 0,10% | 2,7% |
+| Semideus | 0,15% | 4,2% |
+| Divino | 0,20% | 6,2% |
 
 São 560 compras no total. Preços começam menores e crescem com o patamar e os passos locais. O save calcula o preço real e valida o bloqueio coletivo. Resistência e chance de crítico aplicam o ganho sobre o percentual restante, com retornos decrescentes. Toda compra continua útil, sem chegar à imunidade ou garantir críticos apenas pelas melhorias. A interface mostra o ganho efetivo acumulado. Memória Ancestral aumenta somente XP; Fortuna aumenta ouro e XP. Vida e dano percentuais também consideram os equipamentos.
 
@@ -30,4 +30,4 @@ Cada região usa sua versão Soberano do chefe original. Além da dificuldade da
 
 `tests/inventory_mastery_powers.gd` cobre as 560 compras, bloqueios, custo, persistência e efeito real dos atributos; limite de poderes, passivos e sorteios; seis soberanos e suas fúrias; ícones, ordenação, detalhes e equipamento. A regressão geral também verifica responsividade e o restante da progressão. O teste online usa saves isolados e pode simular atraso, variação e perda de pacotes.
 
-Protocolo online atual: `ashenwild-coop-7`. Pacotes antigos não conectam com esta atualização.
+Protocolo online atual: `ashenwild-coop-14`. Pacotes antigos não conectam com esta atualização.

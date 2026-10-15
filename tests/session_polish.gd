@@ -6,6 +6,9 @@ func nodes(node: Node, kind: String) -> Array[Node]:
 	for child in node.get_children(): result.append_array(nodes(child, kind))
 	return result
 
+func equipment_icons(node: Node) -> Array[Node]:
+	return nodes(node, "Control").filter(func(control: Node) -> bool: return control.get_script() == preload("res://scripts/ui/equipment_icon.gd"))
+
 func settle(tree: SceneTree) -> void:
 	for frame in 8: await tree.process_frame
 
@@ -58,18 +61,19 @@ func run(tree: SceneTree) -> void:
 	await settle(tree)
 	var forge = main.page_root.find_child("ForgePanel", true, false)
 	var all_count: int = forge.matched_recipes.size()
-	var all_icons := nodes(main.page_root, "TextureRect").size()
+	var all_icons := equipment_icons(main.page_root).size()
 	var mage_index := 0
 	for index in forge.class_picker.item_count:
 		if str(forge.class_picker.get_item_metadata(index)) == "mage": mage_index = index
 	forge.class_picker.select(mage_index)
 	forge.class_picker.item_selected.emit(mage_index)
 	await settle(tree)
-	assert(forge.matched_recipes.size() < all_count and nodes(main.page_root, "TextureRect").size() > 0)
+	assert(forge.matched_recipes.size() < all_count and equipment_icons(main.page_root).size() > 0)
+	for icon in equipment_icons(main.page_root): assert(icon.item != null and icon.item.class_id in [&"", &"mage"])
 	forge.class_picker.select(0)
 	forge.class_picker.item_selected.emit(0)
 	await settle(tree)
-	assert(forge.matched_recipes.size() == all_count and nodes(main.page_root, "TextureRect").size() == all_icons)
+	assert(forge.matched_recipes.size() == all_count and equipment_icons(main.page_root).size() == all_icons)
 	main._go_back()
 	assert(main.page_name == "prepare")
 	main.queue_free()

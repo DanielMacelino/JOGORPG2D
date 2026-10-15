@@ -5,10 +5,22 @@ const WORKSHOP := preload("res://assets/art/prepare-workshop.png")
 var home := true
 var records := false
 var forge := false
+var worlds := false
 var records_art: Texture2D
+var world_art: Texture2D
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 func _draw() -> void:
+	if worlds:
+		if world_art == null: world_art = load("res://assets/art/world-atlas.png")
+		if world_art != null:
+			var factor := maxf(size.x / world_art.get_width(), size.y / world_art.get_height())
+			var extent := world_art.get_size() * factor
+			draw_texture_rect(world_art, Rect2((size - extent) * 0.5, extent), false)
+			draw_rect(Rect2(Vector2.ZERO, size), Color("#071410", 0.18))
+			for step in 32:
+				draw_rect(Rect2(size.x * step / 32.0, 0, size.x / 32.0 + 1, size.y), Color("#061814", lerpf(0.55, 0.0, float(step) / 31.0)))
+			return
 	if forge:
 		var factor := maxf(size.x / WORKSHOP.get_width(), size.y / WORKSHOP.get_height())
 		var extent := WORKSHOP.get_size() * factor

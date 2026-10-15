@@ -12,9 +12,13 @@ static func protected_ids(save: Dictionary) -> Dictionary:
 	var protected := {}
 	for id in ContentCatalog.classes:
 		protected[str(ContentCatalog.classes[id].starter_weapon)] = true
-	for loadout in save.get("class_loadouts", {}).values():
+	var loadouts: Array = save.get("class_loadouts", {}).values()
+	if int(save.get("character_inventory_schema", 0)) >= 1:
+		loadouts = [save.get("class_loadouts", {}).get(str(save.selected_class), {})]
+	for loadout in loadouts:
 		for id in loadout.values(): protected[str(id)] = true
 	for id in save.get("equipped", {}).values(): protected[str(id)] = true
+	for id in save.get("favorite_equipment", []): protected[str(id)] = true
 	return protected
 
 static func chance(save: Dictionary, rarity: String) -> float:
@@ -51,7 +55,7 @@ static func validate(save: Dictionary, inputs: Array, owner: String) -> String:
 		var id := str(value)
 		var item: EquipmentData = ContentCatalog.equipment.get(id)
 		if item == null or quantity(save, id) == 0: return "Um dos itens não está mais no inventário."
-		if protected.has(id): return "Itens equipados ou iniciais estão protegidos."
+		if protected.has(id): return "Itens favoritos, equipados ou iniciais estão protegidos."
 		if item.class_id != &"" and str(item.class_id) != owner: return "Use itens da classe selecionada ou compartilhados."
 		if rarity.is_empty(): rarity = str(item.rarity)
 		if str(item.rarity) != rarity: return "Os quatro itens precisam ter a mesma raridade."

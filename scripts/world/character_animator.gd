@@ -1,4 +1,6 @@
 extends RefCounted
+const MODELS := preload("res://scripts/data/weapon_models.gd")
+const SHEET := preload("res://scripts/data/character_sheet.gd")
 ## Joint animation uses the original portrait's paths, colors and proportions.
 const LAYERS := {
 	"warrior": {
@@ -109,6 +111,33 @@ static func pose(owner: String, motion: Dictionary) -> Dictionary:
 	return result
 
 static func draw_character(canvas: CanvasItem, owner: String, motion: Dictionary, tint: Color, extent := Vector2(36, 45), origin := Vector2(-18, -33)) -> void:
+	if SHEET.has_class(owner):
+		var frame := SHEET.sample(owner, motion)
+		var texture: Texture2D = frame.texture
+		var factor := minf(extent.y * 0.90 / float(SHEET.HEIGHTS[owner]), extent.x / maxf(1, texture.get_width()))
+		var pivot: Vector2 = frame.pivot
+		var direction: Vector2 = motion.get("facing", Vector2.RIGHT)
+		var flip := direction.x < -0.05
+		var position := origin + extent * Vector2(0.5, 0.95) - Vector2(texture.get_width() - pivot.x if flip else pivot.x, pivot.y) * factor
+		var rect := Rect2(position, texture.get_size() * factor)
+		if flip: rect.size.x = -rect.size.x
+		canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		canvas.draw_texture_rect(texture, rect, false, tint)
+		var ground := origin + extent * Vector2(0.5, 0.95)
+		for model in SHEET.equipment_pose(owner, motion):
+			var side := -1.0 if flip else 1.0
+			canvas.draw_set_transform(ground + Vector2(model.hand) * factor * Vector2(side, 1), float(model.angle) * side, Vector2(side, 1))
+			canvas.draw_texture_rect(model.texture, Rect2(-Vector2(model.grip) * float(model.length) / 32.0 * factor, Vector2.ONE * float(model.length) * factor), false, tint)
+		canvas.draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
+		return
+	var catalog: Node = (Engine.get_main_loop() as SceneTree).root.get_node("ContentCatalog")
+	var requested := str(motion.get("weapon_id", ""))
+	if requested.is_empty():
+		var save: Node = (Engine.get_main_loop() as SceneTree).root.get_node("SaveManager")
+		requested = str(save.loadout_for(owner).get("weapon", ""))
+	var equipped: EquipmentData = catalog.equipment.get(requested)
+	if equipped != null and (equipped.slot != &"weapon" or equipped.class_id not in [&"", StringName(owner)]): equipped = null
+	canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var transforms := pose(owner, motion)
 	var textures: Dictionary = LAYERS.get(owner, LAYERS.warrior)
 	var factor := extent / Vector2(240, 300)
@@ -120,6 +149,20 @@ static func draw_character(canvas: CanvasItem, owner: String, motion: Dictionary
 		var center := (pivot - Vector2(120, 210)) * factor * Vector2(side, 1)
 		var angle := float(transforms.lean) + float(transforms[part]) * side
 		canvas.draw_set_transform(root * center, angle, Vector2(side, 1))
+		if part == "weapon" or (part == "left_weapon" and owner == "assassin") or (part == "left_arm" and owner == "warrior"):
+			var shield: bool = part == "left_arm"
+			var model: Texture2D = MODELS.shield_for(equipped) if shield else MODELS.texture_for(equipped, owner)
+			var hand := Vector2(-8, 34) if shield else (Vector2(-20, 45) if part == "left_weapon" else Vector2(36, 42))
+			if owner == "ranger": hand = Vector2(30, 35)
+			var grip := Vector2(16, 16) if shield or owner == "ranger" else Vector2(7, 25)
+			var length := 78.0 if shield else (90.0 if owner == "assassin" else 128.0)
+			if owner == "ranger": length = 104.0
+			var tilt := 0.0 if shield else (-PI / 4 if owner == "ranger" else (-PI / 5 if owner in ["mage", "druid"] else -PI / 8))
+			if part == "left_weapon": tilt += PI
+			var parent_transform := Transform2D(angle, root * center) * Transform2D(Vector2(side, 0), Vector2(0, 1), Vector2.ZERO)
+			canvas.draw_set_transform_matrix(parent_transform * Transform2D(tilt, hand * factor))
+			canvas.draw_texture_rect(model, Rect2(-grip / 32 * length * factor, Vector2.ONE * length * factor), false, tint)
+			continue
 		var rect := Rect2(-pivot * factor, extent)
 		if extent.x <= 100.0:
 			for outline_offset in [Vector2(-0.8, 0), Vector2(0.8, 0)]:

@@ -20,6 +20,10 @@ func _run() -> void:
 	talents = root.get_node("TalentManager")
 	await _test_menu_audio()
 	await load("res://tests/player_reset.gd").new().run(self)
+	await load("res://tests/character_nature_update.gd").new().run(self)
+	await load("res://tests/character_inventory_bosses.gd").new().run(self)
+	await load("res://tests/player_sheet_models.gd").new().run(self)
+	await load("res://tests/match_equipment_skills.gd").new().run(self)
 	await load("res://tests/network_motion.gd").new().run(self)
 	_test_migration()
 	_test_unlocks()
@@ -27,15 +31,24 @@ func _run() -> void:
 	_test_campaign()
 	_test_damage_and_recovery()
 	await load("res://tests/content_expansion.gd").new().run(self)
+	await load("res://tests/weapon_models.gd").new().run(self)
 	await load("res://tests/animation_update.gd").new().run(self)
+	await load("res://tests/pixel_enemies.gd").new().run(self)
+	await load("res://tests/forge_max_assets.gd").new().run(self)
 	await _test_class_abilities()
 	await _test_summons_and_threat()
 	await _test_expeditions()
 	await load("res://tests/transmutation.gd").new().run(self)
+	await load("res://tests/equipment_wager.gd").new().run(self)
 	await load("res://tests/relics_screen.gd").new().run(self)
 	await load("res://tests/upgrades_screen.gd").new().run(self)
 	await load("res://tests/characters_screen.gd").new().run(self)
 	await load("res://tests/forge_workbench.gd").new().run(self)
+	await load("res://tests/worlds_screen.gd").new().run(self)
+	await load("res://tests/home_plaques.gd").new().run(self)
+	await load("res://tests/prepare_destinations.gd").new().run(self)
+	await load("res://tests/coop_pressure_forge.gd").new().run(self)
+	await load("res://tests/session_usability.gd").new().run(self)
 	await load("res://tests/inventory_mastery_powers.gd").new().run(self)
 	await _test_inventory()
 	await _test_ability_labels()
@@ -285,7 +298,7 @@ func _test_summons_and_threat() -> void:
 	enemy.set_physics_process(false)
 	enemy.health = 5000.0
 	enemy.max_health = 5000.0
-	game._summon_companions("wolf", 2, 14.0)
+	game._summon_companions("rootling", 2, 16.0)
 	assert(get_nodes_in_group("forest_companion").size() == 2)
 	var before: float = enemy.health
 	for companion in get_nodes_in_group("forest_companion"):
@@ -297,7 +310,7 @@ func _test_summons_and_threat() -> void:
 		game._choose_ability(&"wolf_pack")
 		game._choose_ability(&"living_bark")
 	assert(game.player.summon_count == 3 and is_equal_approx(game.player.summon_damage_pct, initial_summon_bonus + 0.54))
-	game._summon_companions("wolf", 2 + game.player.summon_count, 14 + game.player.summon_duration)
+	game._summon_companions("rootling", 2 + game.player.summon_count, 16 + game.player.summon_duration)
 	assert(get_nodes_in_group("forest_companion").size() == 5, "Recasting replaces the previous pack")
 	game._cast_special("ancient_guardian", 3)
 	assert(get_nodes_in_group("forest_companion").size() == 7)
@@ -395,6 +408,11 @@ func _test_expeditions() -> void:
 			assert(get_nodes_in_group("friendly_projectile").size() >= 5)
 			for arrow in get_nodes_in_group("friendly_projectile"):
 				arrow._process(0.1)
+		elif class_id == "druid":
+			assert(enemy.health == health_before, "The nature ultimate summons an ancient instead of dealing instant area damage")
+			for companion in get_nodes_in_group("forest_companion"):
+				if companion.kind == "ancient": companion._physics_process(0.2)
+			assert(enemy.dead or enemy.health < health_before, "The summoned ancient must deal real damage")
 		else:
 			assert(enemy.dead or enemy.health < health_before, "Each class power must cause actual damage")
 		if class_id == "druid" or class_id == "paladin":
@@ -432,7 +450,7 @@ func _test_inventory() -> void:
 	save.data.gold = 10000
 	assert(save.unlock_class("paladin", "gold"))
 	for id in ["wind_boots", "ember_signet", "oak_charm"]:
-		save.unlock_equipment(id)
+		save.unlock_equipment(id, "paladin")
 	save.set_selected_class("paladin")
 	var main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)

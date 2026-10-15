@@ -7,7 +7,7 @@ func _ready() -> void:
 	rng.randomize()
 
 func roll_boss_reward(region: String = "verdant_reach", class_id: String = "warrior", phase: int = 1, owned: Variant = null, difficulty: int = 0) -> Dictionary:
-	var inventory: Array = SaveManager.data.equipment if owned == null else owned
+	var inventory: Array = SaveManager.owned_equipment(class_id) if owned == null else owned
 	var owned_ids := {}
 	for id in inventory: owned_ids[str(id)] = true
 	var pool: Array[EquipmentData] = []

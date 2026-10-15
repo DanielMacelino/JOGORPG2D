@@ -38,6 +38,7 @@ var transmutation_draft: Dictionary = {}
 var relics_draft: Dictionary = {}
 var upgrades_draft: Dictionary = {}
 var characters_draft: Dictionary = {}
+var worlds_draft: Dictionary = {}
 var forge_selected_recipe := ""
 var achievement_filter := "all"
 var bestiary_region := "all"
@@ -138,7 +139,8 @@ func _build_page(page: String) -> void:
 	if backdrop_layer != null and backdrop_layer.get_child_count() > 0:
 		backdrop_layer.get_child(0).home = page in ["home", "prepare"]
 		backdrop_layer.get_child(0).forge = page == "forge"
-		backdrop_layer.get_child(0).records = page in ["records", "online", "inventory", "equipment", "talents", "relics", "upgrades", "characters"]
+		backdrop_layer.get_child(0).worlds = page == "maps"
+		backdrop_layer.get_child(0).records = page in ["records", "online", "inventory", "equipment", "talents", "relics", "upgrades", "characters", "transmutation", "maps"]
 		backdrop_layer.get_child(0).queue_redraw()
 	if page_root != null and is_instance_valid(page_root):
 		page_root.queue_free()
@@ -148,12 +150,14 @@ func _build_page(page: String) -> void:
 	shell.add_child(page_root)
 	page_root.modulate.a = 0.0
 	var enter_tween := create_tween()
-	enter_tween.tween_property(page_root, "modulate:a", 1.0, 0.18)
+	enter_tween.tween_property(page_root, "modulate:a", 1.0 if page in ["home", "maps"] else 0.9, 0.18)
 	var paper_margin := MarginContainer.new()
 	paper_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	paper_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var viewport_width := get_viewport_rect().size.x
 	var page_side_margin := maxi(0, roundi((viewport_width - 1160.0) * 0.5)) if viewport_width >= 900.0 else 4
+	if page == "home" and viewport_width >= 760:
+		page_side_margin = maxi(0, roundi(viewport_width * 0.067) - int(shell.get_theme_constant("margin_left")))
 	paper_margin.add_theme_constant_override("margin_left", page_side_margin)
 	paper_margin.add_theme_constant_override("margin_right", page_side_margin)
 	page_root.add_child(paper_margin)
@@ -161,7 +165,7 @@ func _build_page(page: String) -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 10)
 	var scroll: ScrollContainer = null
-	if page in ["online", "inventory", "equipment", "talents", "forge", "transmutation", "relics", "upgrades", "characters"]:
+	if page in ["home", "online", "inventory", "equipment", "talents", "forge", "transmutation", "relics", "upgrades", "characters", "maps"]:
 		page_scroll = null
 		var viewport := preload("res://scripts/ui/menu/online_viewport.gd").new()
 		viewport.content = content
@@ -207,6 +211,14 @@ func _go_back() -> void:
 	var previous: String = page_history.pop_back() if not page_history.is_empty() else "home"
 	_build_page(previous)
 	if not page_history.is_empty(): page_history.pop_back()
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event.is_echo() or not event.is_action_pressed("ui_cancel") or shell == null or not shell.visible or page_name == "home": return
+	for button in page_root.find_children("*", "Button", true, false):
+		if button.is_visible_in_tree() and not button.disabled and button.text.contains("VOLTAR"):
+			button.pressed.emit()
+			get_viewport().set_input_as_handled()
+			return
 
 # ═══════════════════════════════════════════════════════════
 # HOME
@@ -489,75 +501,28 @@ func _rarity_badge(parent: Node, rarity: String) -> void:
 # MAPAS
 # ═══════════════════════════════════════════════════════════
 func _build_maps(parent: VBoxContainer) -> void:
-	_build_page_heading(parent, "DIMENSÕES", "6 regiões · 10 fases em cada dimensão · 60 vitórias abrem a próxima dificuldade.")
-	var tier_picker := OptionButton.new()
-	tier_picker.custom_minimum_size.y = 42
-	tier_picker.fit_to_longest_item = false
-	tier_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var highest := int(SaveManager.data.highest_difficulty)
-	for tier in range(maxi(7, highest + 2)):
-		var open: bool = tier <= highest
-		tier_picker.add_item("%s · %s" % [CampaignRules.difficulty_name(tier), "%d/60 fases" % SaveManager.campaign_cleared(tier) if open else "conclua a dificuldade anterior"])
-		tier_picker.set_item_disabled(tier, not open)
-	tier_picker.select(selected_difficulty)
-	tier_picker.item_selected.connect(_select_difficulty)
-	parent.add_child(tier_picker)
-	var compact := get_viewport_rect().size.x < 620.0
-	for id in ContentCatalog.MAP_ORDER:
-		var map: MapData = ContentCatalog.maps[id]
-		var unlocked := SaveManager.phase_unlocked(id, 1, selected_difficulty)
-		var completed := 0
-		for phase in range(1, 11):
-			if SaveManager.phase_completed(id, phase, selected_difficulty):
-				completed += 1
-		var card := _panel(parent, PANEL.lerp(map.accent, 0.08) if unlocked else PANEL.darkened(0.12), Vector2.ZERO)
-		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 10)
-		card.add_child(_pad(content, 13, 9, 13, 9))
-		var heading := HBoxContainer.new()
-		heading.add_theme_constant_override("separation", 12)
-		content.add_child(heading)
-		var art := preload("res://scripts/ui/region_art.gd").new()
-		art.region_theme = map.theme
-		art.accent = map.accent
-		art.custom_minimum_size = Vector2(64 if compact else 100, 84)
-		art.modulate.a = 1.0 if unlocked else 0.45
-		heading.add_child(art)
-		var info := VBoxContainer.new()
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		heading.add_child(info)
-		_label(info, "REGIÃO %02d · %02d/10 FASES" % [map.stage_index + 1, completed], 10, map.accent if unlocked else STYLE.MUTED)
-		_label(info, map.display_name, 22, STYLE.TEXT if unlocked else STYLE.MUTED)
-		_label(info, map.description, 12, STYLE.MUTED)
-		var boss_data: EnemyData = ContentCatalog.enemies.get(str(map.boss_id))
-		_label(info, "Chefe: %s · criaturas e força evoluem a cada fase" % boss_data.display_name, 11, map.accent)
-		var phases := GridContainer.new()
-		phases.columns = 3 if get_viewport_rect().size.x < 400 else (4 if get_viewport_rect().size.x < 520 else (5 if compact else 10))
-		phases.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		phases.add_theme_constant_override("h_separation", 5)
-		phases.add_theme_constant_override("v_separation", 5)
-		content.add_child(phases)
-		for phase in range(1, 11):
-			var done := SaveManager.phase_completed(id, phase, selected_difficulty)
-			var available := SaveManager.phase_unlocked(id, phase, selected_difficulty)
-			var selected: bool = selected_map == id and selected_phase == phase
-			var button := _button(phases, "%02d%s" % [phase, " ✓" if done else (" ·" if selected else "")], _select_phase.bind(str(id), phase), selected, 42)
-			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			button.disabled = not available
-			button.tooltip_text = "%s · %s\n%s\n%s" % [map.display_name, CampaignRules.PHASE_NAMES[phase - 1], CampaignRules.phase_objective(phase), "Concluída; pode repetir." if done else ("Disponível." if available else "Conclua a fase anterior.")]
-		if selected_map == id:
-			_label(content, "FASE %02d · %s" % [selected_phase, CampaignRules.PHASE_NAMES[selected_phase - 1]], 12, map.accent)
-			_label(content, CampaignRules.phase_objective(selected_phase), 12, STYLE.MUTED)
-			var signature: EquipmentData = ContentCatalog.equipment.get(str(id) + "_" + selected_class)
-			if signature != null:
-				_label(content, "ACHADO REGIONAL · " + signature.display_name + "\n" + signature.description, 11, GOLD)
-			_button(content, "JOGAR FASE %02d · %s" % [selected_phase, CampaignRules.difficulty_name(selected_difficulty)], _start_game.bind(false), true, 42)
-	_label(parent, "Fácil → Médio → Moderado → Difícil → Épico → Semideus → Deus → Deus II…\nCada dificuldade guarda suas próprias fases concluídas. Repetir fases também dá experiência ao personagem.", 12, STYLE.MUTED)
+	var worlds := preload("res://scripts/ui/worlds_panel.gd").new()
+	worlds.selected_map = selected_map
+	worlds.selected_phase = selected_phase
+	worlds.tier = selected_difficulty
+	worlds.class_id = selected_class
+	worlds.draft = worlds_draft
+	worlds.back_requested.connect(_go_back)
+	worlds.difficulty_selected.connect(_select_difficulty)
+	worlds.phase_selected.connect(_select_phase)
+	worlds.start_requested.connect(func(id: String, phase: int) -> void:
+		if not SaveManager.phase_unlocked(id, phase, selected_difficulty): return
+		selected_map = id
+		selected_phase = phase
+		_save_destination()
+		_start_game(false))
+	parent.add_child(worlds)
 
 func _select_difficulty(tier: int) -> void:
 	if tier < 0 or tier > int(SaveManager.data.highest_difficulty):
 		return
 	selected_difficulty = tier
+	worlds_draft.clear()
 	var ordinal := mini(59, SaveManager.campaign_cleared(tier))
 	selected_map = str(ContentCatalog.MAP_ORDER[floori(float(ordinal) / 10.0)])
 	selected_phase = ordinal % 10 + 1
@@ -684,7 +649,7 @@ func _build_bestiary(parent: VBoxContainer) -> void:
 	for enemy_id in ContentCatalog.enemies:
 		if bestiary_region != "all":
 			var region: MapData = ContentCatalog.maps.get(bestiary_region)
-			if region != null and not region.enemy_pool.has(StringName(enemy_id)) and region.elite_id != StringName(enemy_id) and region.boss_id != StringName(enemy_id):
+			if region != null and not region.enemy_pool.has(StringName(enemy_id)) and region.elite_id != StringName(enemy_id) and region.boss_id != StringName(enemy_id) and str(enemy_id) != "loot_mimic" and not (str(region.id) == "verdant_reach" and str(enemy_id) == "minotaur"):
 				continue
 		var enemy: EnemyData = ContentCatalog.enemies[enemy_id]
 		var kill_count: int = int(kills.get(enemy_id, 0))
@@ -732,7 +697,7 @@ func _build_bestiary(parent: VBoxContainer) -> void:
 		var habitats: Array[String] = []
 		for region_id in ContentCatalog.MAP_ORDER:
 			var region: MapData = ContentCatalog.maps[region_id]
-			if region.enemy_pool.has(StringName(enemy_id)) or region.elite_id == StringName(enemy_id) or region.boss_id == StringName(enemy_id):
+			if region.enemy_pool.has(StringName(enemy_id)) or region.elite_id == StringName(enemy_id) or region.boss_id == StringName(enemy_id) or str(enemy_id) == "loot_mimic" or (str(region.id) == "verdant_reach" and str(enemy_id) == "minotaur"):
 				habitats.append(region.display_name)
 		_label(info, " / ".join(habitats), 9, STYLE.MUTED)
 

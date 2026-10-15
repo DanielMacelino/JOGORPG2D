@@ -30,15 +30,23 @@ func _ready() -> void:
 	_build_equipment()
 	preload("res://scripts/data/regional_equipment.gd").populate(equipment)
 	preload("res://scripts/data/equipment_expansion.gd").populate(equipment, classes)
+	preload("res://scripts/data/sheet_equipment.gd").populate(equipment, classes)
+	preload("res://scripts/data/accessory_models.gd").populate(equipment)
 	_build_maps()
 	_build_waves()
 	_build_relics()
 	_build_forge_recipes()
 	preload("res://scripts/data/equipment_expansion.gd").populate_recipes(forge_recipes, equipment)
-	for recipe in forge_recipes: forge_index[str(recipe.id)] = recipe
+	for recipe in forge_recipes:
+		recipe.result_name = equipment[str(recipe.result)].display_name
+		for ingredient in recipe.ingredients:
+			ingredient.name = equipment[str(ingredient.id)].display_name
+		forge_index[str(recipe.id)] = recipe
 	_build_achievements()
 	_build_upgrades()
 	_build_bounties()
+	preload("res://scripts/data/regional_boss_art.gd").warm_cache()
+	preload("res://scripts/data/character_sheet.gd").warm_cache()
 
 func _resource(script: Script, fields: Dictionary) -> Resource:
 	var item: Resource = script.new()
@@ -60,7 +68,7 @@ func _build_classes() -> void:
 	classes["mage"] = _resource(CLASS_DATA, {"id": &"mage", "display_name": "Tecelã", "description": "Pouca vida, magia poderosa em área e ataques a longa distância. Precisa manter espaço.", "accent": Color("#96deef"), "max_health": 80.0, "damage": 30.0, "defense": 0.0, "speed": 215.0, "attack_cooldown": 0.95, "attack_range": 430.0, "splash_radius": 90.0, "projectile_speed": 480.0, "attack_style": &"magic", "starting_ability": &"arcane_focus", "starter_weapon": &"moon_staff", "cost_gold": 0, "cost_crystals": 0})
 	classes["ranger"] = _resource(CLASS_DATA, {"id": &"ranger", "display_name": "Batedora", "description": "Uma torrente de flechas: ataque muito rápido, dano médio e movimento veloz. Vida tão baixa quanto a Tecelã.", "accent": Color("#d0e5a0"), "max_health": 80.0, "damage": 13.0, "defense": 0.0, "speed": 310.0, "attack_cooldown": 0.25, "attack_range": 400.0, "projectile_speed": 760.0, "attack_style": &"ranged", "starting_ability": &"keen_eye", "starter_weapon": &"thorn_bow", "cost_gold": 0, "cost_crystals": 0})
 	classes["assassin"] = _resource(CLASS_DATA, {"id": &"assassin", "display_name": "Lâmina da Noite", "description": "Pouca vida e adagas extremamente rápidas. Mesmo dano por golpe da Batedora, mas precisa lutar perto.", "accent": Color("#d8b1e7"), "max_health": 72.0, "damage": 13.0, "defense": 1.0, "speed": 290.0, "attack_cooldown": 0.22, "attack_range": 105.0, "projectile_speed": 460.0, "attack_style": &"melee", "starting_ability": &"shadow_step", "starter_weapon": &"twin_daggers", "cost_gold": 450, "cost_crystals": 6})
-	classes["druid"] = _resource(CLASS_DATA, {"id": &"druid", "display_name": "Guardião da Seiva", "description": "Conjurador frágil de longo alcance. Invoca lobos de seiva temporários e desperta guardiões da floresta.", "accent": Color("#a9ebaa"), "max_health": 85.0, "damage": 26.0, "defense": 0.0, "speed": 210.0, "attack_cooldown": 1.10, "attack_range": 400.0, "splash_radius": 68.0, "projectile_speed": 440.0, "attack_style": &"magic", "starting_ability": &"wild_growth", "starter_weapon": &"root_staff", "cost_gold": 700, "cost_crystals": 9})
+	classes["druid"] = _resource(CLASS_DATA, {"id": &"druid", "display_name": "Guardião da Seiva", "description": "Invocador da natureza: brotos, lobos e guardiões lutam por você. Raízes e árvores controlam a horda", "accent": Color("#a9ebaa"), "max_health": 85.0, "damage": 14.0, "defense": 0.0, "speed": 210.0, "attack_cooldown": 1.15, "attack_range": 400.0, "splash_radius": 30.0, "projectile_speed": 440.0, "attack_style": &"magic", "starting_ability": &"wild_growth", "starter_weapon": &"root_staff", "cost_gold": 700, "cost_crystals": 9})
 	classes["paladin"] = _resource(CLASS_DATA, {"id": &"paladin", "display_name": "Arauto do Sol", "description": "Guerreiro equilibrado: vida média, armadura sólida, dano médio e passo constante.", "accent": Color("#ffe2a1"), "max_health": 190.0, "damage": 17.0, "defense": 4.0, "speed": 220.0, "attack_cooldown": 0.68, "attack_range": 128.0, "projectile_speed": 460.0, "attack_style": &"melee", "starting_ability": &"holy_oath", "starter_weapon": &"oath_hammer", "cost_gold": 950, "cost_crystals": 12})
 
 # ═══════════════════════════════════════════════════════════
@@ -78,7 +86,7 @@ func _build_abilities() -> void:
 	_add_ability("keen_eye", "Olho Aguçado", "Crítico +8% e alcance +10%.", "uncommon", {"stat": &"keen_eye", "unlock_only": true})
 
 	_add_ability("shadow_step", "Passo das Sombras", "Crítico +8% e velocidade de movimento +8%.", "uncommon", {"stat": &"shadow_step", "unlock_only": true})
-	_add_ability("wild_growth", "Chamado da Seiva", "Invoca 2 lobos aliados por 14 s, a cada 18 s. Eles perseguem e atacam os monstros.", "uncommon", {"stat": &"wild_growth", "unlock_only": true})
+	_add_ability("wild_growth", "Chamado da Seiva", "Invoca 2 brotos aliados por 16 s, a cada 18 s. Melhorias fortalecem a tropa da natureza.", "uncommon", {"stat": &"wild_growth", "unlock_only": true})
 	_add_ability("holy_oath", "Juramento Solar", "Defesa +2 e vida máxima +8%.", "uncommon", {"stat": &"holy_oath", "unlock_only": true})
 
 	# Habilidades comuns
@@ -124,8 +132,8 @@ func _configure_ability_pools() -> void:
 		abilities[id].bonuses = base_bonuses[id]
 	var owners := {
 		"iron_will": ["warrior"], "arcane_focus": ["mage"], "keen_eye": ["ranger"], "shadow_step": ["assassin"], "wild_growth": ["druid"], "holy_oath": ["paladin"],
-		"thorn_aura": ["warrior", "druid", "paladin"], "berserker": ["warrior", "assassin", "paladin"],
-		"ember_orb": ["mage", "druid"], "frost_nova": ["mage"], "echo_strike": ["ranger", "assassin", "paladin"],
+		"thorn_aura": ["warrior", "paladin"], "berserker": ["warrior", "assassin", "paladin"],
+		"ember_orb": ["mage"], "frost_nova": ["mage"], "echo_strike": ["ranger", "assassin", "paladin"],
 		"storm_arc": ["mage"], "blade_storm": ["warrior", "assassin", "paladin"], "time_warp": ["mage"], "starfall": ["mage"], "void_rift": ["mage"]}
 	for id in owners:
 		for owner in owners[id]:
@@ -146,20 +154,32 @@ func _configure_ability_pools() -> void:
 	_class_ability("fletching", "Flechas Perfurantes", "Cada flecha atravessa mais 1 inimigo por escolha.", "uncommon", "ranger", {"projectile_pierce": 1.0})
 	_class_ability("steady_aim", "Mira Precisa", "Dano +12% e crítico +4 pontos percentuais por escolha.", "uncommon", "ranger", {"damage_pct": 0.12, "crit_chance": 0.04})
 	_class_ability("volley", "Rajada de Vespera", "Leque de flechas periódico. Cada nível acrescenta uma flecha e aumenta o dano.", "rare", "ranger")
+	_class_ability("binding_shot", "Disparo Imobilizante", "Flecha perfurante que desacelera os alvos e abre espaço para a Batedora.", "uncommon", "ranger")
+	abilities.binding_shot.icon_id = &"fletching"
+	_class_ability("arrow_rain", "Chuva de Flechas", "Uma chuva de flechas atinge a área do alvo distante.", "epic", "ranger")
+	abilities.arrow_rain.icon_id = &"volley"
 	_class_ability("deadly_rhythm", "Ritmo Mortal", "Velocidade de ataque +16% por escolha.", "common", "assassin", {"attack_speed_pct": 0.16})
 	_class_ability("razor_dance", "Dança das Adagas", "Ataques acertam mais 1 alvo e ganham +6% de dano por escolha.", "uncommon", "assassin", {"cleave_targets": 1.0, "damage_pct": 0.06})
 	_class_ability("night_hunger", "Fome da Noite", "Dano +12% e roubo de vida +2% por escolha. Cura até 1,5% da vida máxima/s.", "uncommon", "assassin", {"damage_pct": 0.12, "lifesteal": 0.02})
 	_class_ability("shadow_burst", "Ecos da Noite", "Golpe periódico nos inimigos próximos. Cada nível soma um alvo e dano.", "rare", "assassin")
-	_class_ability("wolf_pack", "Matilha da Seiva", "Mais 1 lobo e +2 s de duração das invocações por escolha.", "common", "druid", {"summon_count": 1.0, "summon_duration": 2.0})
+	_class_ability("dagger_fan", "Leque de Adagas", "Lança adagas em leque e perfura o cerco à frente da Lâmina da Noite.", "rare", "assassin")
+	abilities.dagger_fan.icon_id = &"razor_dance"
+	_class_ability("wolf_pack", "Matilha da Seiva", "Mais 1 broto aliado e +2 s de duração por escolha. A tropa comporta até seis brotos.", "common", "druid", {"summon_count": 1.0, "summon_duration": 2.0})
 	_class_ability("living_bark", "Pacto da Floresta", "Dano das invocações +18% e velocidade de ataque delas +10% por escolha.", "uncommon", "druid", {"summon_damage_pct": 0.18, "summon_speed_pct": 0.10})
 	_class_ability("ancient_guardian", "Guardiões de Casca", "Invoca um guardião por 14 s. Níveis somam dano e duração; níveis 3 e 5 acrescentam um guardião.", "rare", "druid")
 	_class_ability("roots_snare", "Abraço das Raízes", "Raízes ferem e retardam os monstros próximos. Cada nível soma dano, área e lentidão.", "uncommon", "druid")
+	_class_ability("nature_pack", "Alcateia do Bosque", "Lobos de seiva perseguem e mordem os inimigos.", "rare", "druid")
+	abilities.nature_pack.icon_id = &"wolf_pack"
+	_class_ability("living_grove", "Bosque Desperto", "Árvores aliadas atacam à distância e prendem inimigos com raízes.", "epic", "druid")
+	abilities.living_grove.icon_id = &"ancient_guardian"
 	_class_ability("solar_armor", "Aço da Aurora", "Vida +10% e defesa +2 por escolha.", "common", "paladin", {"health_pct": 0.10, "defense": 2.0})
 	_class_ability("oath_edge", "Peso do Juramento", "Dano +12% e velocidade de ataque +8% por escolha.", "uncommon", "paladin", {"damage_pct": 0.12, "attack_speed_pct": 0.08})
 	_class_ability("sunfire", "Arco Solar", "Golpe em área periódico. Cada nível soma dano e alcance.", "rare", "paladin")
 	_class_ability("restoring_light", "Luz Restauradora", "Vida máxima +8% e regeneração +0,6 de vida/s por escolha.", "uncommon", "paladin", {"health_pct": 0.08, "regen": 0.6})
 
-	for power_id in ["thorn_aura", "ember_orb", "frost_nova", "storm_arc", "blade_storm", "time_warp", "starfall", "void_rift", "challenge_shout", "glacial_ring", "volley", "shadow_burst", "ancient_guardian", "roots_snare", "sunfire"]:
+	_add_ability("arcane_bloom", "Eclosão do Éter", "Onda expansiva: atinge cada inimigo ao redor uma vez.", "rare", {"icon_id": &"void_rift"})
+	abilities.arcane_bloom.class_ids.assign([&"mage", &"druid"])
+	for power_id in ["binding_shot", "arrow_rain", "dagger_fan", "nature_pack", "living_grove", "arcane_bloom", "thorn_aura", "ember_orb", "frost_nova", "storm_arc", "blade_storm", "time_warp", "starfall", "void_rift", "challenge_shout", "glacial_ring", "volley", "shadow_burst", "ancient_guardian", "roots_snare", "sunfire"]:
 		abilities[power_id].active_power = true
 
 func _class_ability(id: String, title: String, description: String, rarity: String, owner: String, bonuses: Dictionary = {}) -> void:
@@ -173,6 +193,15 @@ func _add_enemy(id: String, title: String, hp: float, damage: float, speed: floa
 	enemies[id] = _resource(ENEMY_DATA, {"id": StringName(id), "art_id": StringName(id), "display_name": title, "max_health": hp, "damage": damage, "speed": speed, "xp": xp, "gold": gold, "attack_range": range, "elite": elite, "boss": boss, "tips": tips, "attack_style": style, "projectile_color": tint})
 
 func _build_enemies() -> void:
+	_add_enemy("blood_monster", "Sanguinário da Fenda", 86.0, 10.0, 105.0, 10, 4, 40.0, false, false, "Um caçador de lâminas vivas. Surge nas regiões avançadas e pune o combate parado.")
+	_add_enemy("canarinho", "Canário Errante", 65.0, 8.0, 126.0, 8, 3, 35.0, false, false, "Ágil e agressivo. Abra caminho antes que seu bando cerque a rota.")
+	_add_enemy("spore_zombie", "Zumbi de Esporos", 120.0, 11.0, 57.0, 12, 4, 38.0, false, false, "Um corpo dominado pela seiva corrompida. Resistente e lento.")
+	_add_enemy("azure_slime", "Gosma da Maré Azul", 90.0, 8.0, 66.0, 9, 3, 36.0, false, false, "Uma massa elástica que avança entre os enxames. Não subestime sua resistência.")
+	_add_enemy("demon_a", "Demônio da Fenda", 48.0, 8.0, 96.0, 8, 3, 40.0, false, false, "Seu machado pune quem fica parado. Surge a partir da segunda região; mantenha uma rota de fuga.")
+	_add_enemy("loot_mimic", "Baú Raivoso", 420.0, 13.0, 62.0, 45, 22, 42.0, true, false, "Mini chefe da quarta onda. Sua derrota garante um equipamento para cada viajante.")
+	_add_enemy("red_orb", "Devorador Rubro", 26.0, 6.0, 112.0, 5, 2, 35.0, false, false, "Uma criatura voadora veloz. Abra espaço antes que alcance você.")
+	_add_enemy("barrel_beast", "Barril Voraz", 65.0, 9.0, 51.0, 9, 4, 38.0, false, false, "Madeira encantada, dentes afiados e muita resistência. Evite o cerco.")
+	_add_enemy("minotaur", "Minotauro do Espinheiro", 650.0, 19.0, 69.0, 130, 150, 72.0, false, true, "Soberano da décima fase dos Ermos. Desvie das linhas do machado e das ondas de impacto.")
 	_add_enemy("slime", "Gosma de Musgo", 18.0, 4.0, 57.0, 3, 1, 32.0, false, false, "Lenta e frágil. Golpes em área limpam os enxames.")
 	_add_enemy("goblin", "Catador", 24.0, 5.0, 79.0, 4, 1, 34.0, false, false, "Avança em grupos para cercar o caminho.")
 	_add_enemy("wolf", "Lobo Cinzento", 20.0, 5.0, 117.0, 4, 1, 34.0, false, false, "Rápido e frágil. Elimine-o antes de atravessar a matilha.")
@@ -186,14 +215,14 @@ func _build_enemies() -> void:
 	_add_enemy("bone_archer", "Arqueiro da Cripta", 23.0, 6.0, 50.0, 5, 2, 250.0, false, false, "Flechas antigas cruzam o cemitério. Mova-se entre os disparos.", &"ranged", Color("#cfc7ab"))
 	_add_enemy("crypt_wisp", "Lume Funerário", 20.0, 6.0, 82.0, 5, 2, 230.0, false, false, "Uma alma leve que lança luz espectral à distância.", &"ranged", Color("#9cc9c1"))
 	_add_enemy("dark_mage", "Necromante Menor", 88.0, 10.0, 50.0, 20, 9, 270.0, true, false, "Projéteis espectrais e muita resistência. Elimine-o antes do cerco.", &"ranged", Color("#b9a9d0"))
-	_add_enemy("death_lord", "Guardião do Ossuário", 570.0, 17.0, 61.0, 95, 120, 62.0, false, true, "Sua foice alcança longe. Contorne o guardião e deixe os mortos para trás.")
+	_add_enemy("death_lord", "Ceifador do Ossuário", 570.0, 17.0, 61.0, 95, 120, 62.0, false, true, "Sua foice alcança longe. Contorne o ceifador e deixe os mortos para trás.")
 	_add_enemy("cinder_imp", "Diabrete de Brasa", 21.0, 5.0, 88.0, 4, 1, 32.0, false, false, "Pequeno e apressado. Cai rápido sob fogo concentrado.")
 	_add_enemy("ash_hound", "Cão de Cinza", 24.0, 6.0, 124.0, 4, 1, 35.0, false, false, "Persegue pelas fendas. Evite correr diretamente para a matilha.")
 	_add_enemy("ember_beetle", "Besouro Incandescente", 36.0, 6.0, 54.0, 5, 2, 34.0, false, false, "Carapaça pesada e passos lentos. Agrupe-os antes de atacar.")
 	_add_enemy("fire_witch", "Feiticeira da Cinza", 27.0, 7.0, 49.0, 6, 2, 265.0, false, false, "Lança brasas de longe. Os disparos alaranjados são sua maior ameaça.", &"ranged", Color("#e6a36d"))
 	_add_enemy("obsidian_guard", "Vigia de Obsidiana", 46.0, 8.0, 57.0, 7, 3, 40.0, false, false, "Uma muralha de pedra negra. Esquive e ataque pelos lados.")
 	_add_enemy("molten_knight", "Cavaleiro Fundido", 105.0, 11.0, 69.0, 23, 10, 44.0, true, false, "Ataques repetidos quebram sua carapaça incandescente.")
-	_add_enemy("lava_lord", "Coração da Caldeira", 610.0, 18.0, 55.0, 105, 140, 68.0, false, true, "Uma massa de rocha e fogo. Ataque durante suas aproximações lentas.")
+	_add_enemy("lava_lord", "Geógrafo da Caldeira", 610.0, 18.0, 55.0, 105, 140, 68.0, false, true, "Uma massa de rocha e fogo. Ataque durante suas aproximações lentas.")
 	_add_enemy("bloodling", "Servo Rubro", 22.0, 6.0, 94.0, 4, 1, 32.0, false, false, "A fome o traz em grupos. Elimine-os em sequência para abrir passagem.")
 	_add_enemy("fallen_guard", "Guarda Caído", 39.0, 7.0, 69.0, 6, 2, 39.0, false, false, "A armadura ainda protege o cadáver. Tenha espaço para recuar.")
 	_add_enemy("cult_archer", "Besteiro do Véu", 27.0, 7.0, 53.0, 6, 2, 280.0, false, false, "Disparos precisos de longe. Aproxime-se em diagonal.", &"ranged", Color("#d4ad9a"))
@@ -206,14 +235,14 @@ func _build_enemies() -> void:
 	_add_enemy("ice_archer", "Caçador da Geada", 28.0, 7.0, 54.0, 6, 2, 285.0, false, false, "Flechas azuladas atravessam o bosque. Desvie em movimento contínuo.", &"ranged", Color("#b4dbe1"))
 	_add_enemy("frost_shaman", "Xamã do Inverno", 33.0, 8.0, 47.0, 7, 3, 270.0, false, false, "Concentra o frio em projéteis. Derrube-o antes de se afastar demais.", &"ranged", Color("#87c7dd"))
 	_add_enemy("frost_brute", "Colosso da Geada", 112.0, 12.0, 64.0, 25, 12, 47.0, true, false, "Lento e robusto. Reserve seus golpes fortes para o colosso.")
-	_add_enemy("frost_guardian", "Ancião do Inverno", 670.0, 19.0, 65.0, 125, 180, 66.0, false, true, "Uma criatura de gelo e raízes. Sua presença atrai a matilha do bosque.")
+	_add_enemy("frost_guardian", "Lobo do Inverno", 670.0, 19.0, 65.0, 125, 180, 66.0, false, true, "Uma fera de gelo. Sua presença atrai a matilha do bosque.")
 	_add_enemy("bogling", "Filho do Lodo", 23.0, 6.0, 71.0, 4, 1, 33.0, false, false, "O lodo toma forma em muitos pequenos corpos. Ataque vários por vez.")
 	_add_enemy("swamp_leech", "Sanguessuga do Charco", 18.0, 5.0, 113.0, 4, 1, 30.0, false, false, "Pequena e voraz. Não deixe o enxame encostar.")
 	_add_enemy("reed_stalker", "Espreitador dos Juncos", 30.0, 7.0, 105.0, 6, 2, 37.0, false, false, "Avança por entre os juncos. Separe-o das criaturas mais lentas.")
 	_add_enemy("spore_shaman", "Arauto dos Esporos", 32.0, 8.0, 44.0, 7, 3, 250.0, false, false, "Projéteis amarelados brotam de seu cajado. Elimine à distância.", &"ranged", Color("#cbd37c"))
 	_add_enemy("mire_toad", "Sapo do Brejo", 48.0, 8.0, 58.0, 7, 3, 40.0, false, false, "Pesado e resistente. Limpe os pequenos antes de enfrentar o sapo.")
 	_add_enemy("mire_titan", "Gigante do Brejo", 115.0, 13.0, 61.0, 26, 12, 49.0, true, false, "Musgo e lama cobrem um corpo enorme. Contorne-o sem perder o ritmo.")
-	_add_enemy("mire_queen", "Rainha do Charco", 690.0, 20.0, 62.0, 135, 200, 68.0, false, true, "A soberana anfíbia protege o charco. Enxames cercam seus passos pesados.")
+	_add_enemy("mire_queen", "Rainha do Charco", 690.0, 20.0, 62.0, 135, 200, 68.0, false, true, "A soberana das raízes protege o charco. Enxames cercam seus passos pesados.")
 
 # ═══════════════════════════════════════════════════════════
 # EQUIPAMENTOS
@@ -283,11 +312,20 @@ func _add_equipment(id: String, title: String, slot: String, rarity: String, des
 # ═══════════════════════════════════════════════════════════
 func _build_maps() -> void:
 	maps["verdant_reach"] = _resource(MAP_DATA, {"id": &"verdant_reach", "display_name": "Ermos de Vespera", "description": "Musgo, matilhas e catadores nos caminhos da floresta antiga.", "theme": &"forest", "duration": 144.0, "boss_id": &"goblin_king", "elite_id": &"elite", "difficulty": 1, "stage_index": 0, "accent": Color("#a5b482"), "unlocked_by_default": true, "enemy_pool": _pool([&"slime", &"goblin", &"wolf", &"archer", &"mage"])})
-	maps["hollow_cairn"] = _resource(MAP_DATA, {"id": &"hollow_cairn", "display_name": "Colina Oca", "description": "Mortos caminham entre lápides e os lumes iluminam as criptas.", "theme": &"graveyard", "duration": 156.0, "boss_id": &"death_lord", "elite_id": &"dark_mage", "difficulty": 1.16, "stage_index": 1, "accent": Color("#b8b1c2"), "unlocked_by_default": false, "enemy_pool": _pool([&"skeleton", &"bat", &"zombie", &"bone_archer", &"crypt_wisp"])})
-	maps["ember_crater"] = _resource(MAP_DATA, {"id": &"ember_crater", "display_name": "Cratera Rubra", "description": "Cinza, brasas e carapaças de obsidiana cercam a caldeira.", "theme": &"volcanic", "duration": 168.0, "boss_id": &"lava_lord", "elite_id": &"molten_knight", "difficulty": 1.32, "stage_index": 2, "accent": Color("#d6a078"), "unlocked_by_default": false, "enemy_pool": _pool([&"cinder_imp", &"ash_hound", &"ember_beetle", &"fire_witch", &"obsidian_guard"])})
-	maps["black_keep"] = _resource(MAP_DATA, {"id": &"black_keep", "display_name": "Castelo Sem Aurora", "description": "O culto rubro e seus guardas ocupam os salões sem sol.", "theme": &"castle", "duration": 180.0, "boss_id": &"vampire_king", "elite_id": &"dusk_knight", "difficulty": 1.5, "stage_index": 3, "accent": Color("#c897a3"), "unlocked_by_default": false, "enemy_pool": _pool([&"bloodling", &"bat", &"fallen_guard", &"cult_archer", &"blood_mage"])})
-	maps["frostwood"] = _resource(MAP_DATA, {"id": &"frostwood", "display_name": "Bosque da Geada", "description": "Neve cobre as raízes; a matilha branca protege um inverno eterno.", "theme": &"frost", "duration": 188.0, "boss_id": &"frost_guardian", "elite_id": &"frost_brute", "difficulty": 1.65, "stage_index": 4, "accent": Color("#a2c7d0"), "unlocked_by_default": false, "enemy_pool": _pool([&"ice_slime", &"snow_wolf", &"frost_spider", &"ice_archer", &"frost_shaman"])})
-	maps["sunken_mire"] = _resource(MAP_DATA, {"id": &"sunken_mire", "display_name": "Charco Esquecido", "description": "Lama, juncos e esporos ocultam a coroa da rainha anfíbia.", "theme": &"swamp", "duration": 196.0, "boss_id": &"mire_queen", "elite_id": &"mire_titan", "difficulty": 1.8, "stage_index": 5, "accent": Color("#b9c38a"), "unlocked_by_default": false, "enemy_pool": _pool([&"bogling", &"swamp_leech", &"reed_stalker", &"spore_shaman", &"mire_toad"])})
+	maps["hollow_cairn"] = _resource(MAP_DATA, {"id": &"hollow_cairn", "display_name": "Colina Oca", "description": "Mortos caminham entre lápides e os lumes iluminam as criptas.", "theme": &"graveyard", "duration": 156.0, "boss_id": &"death_lord", "elite_id": &"dark_mage", "difficulty": 3.1, "stage_index": 1, "accent": Color("#b8b1c2"), "unlocked_by_default": false, "enemy_pool": _pool([&"skeleton", &"bat", &"zombie", &"bone_archer", &"crypt_wisp"])})
+	maps["ember_crater"] = _resource(MAP_DATA, {"id": &"ember_crater", "display_name": "Cratera Rubra", "description": "Cinza, brasas e carapaças de obsidiana cercam a caldeira.", "theme": &"volcanic", "duration": 168.0, "boss_id": &"lava_lord", "elite_id": &"molten_knight", "difficulty": 4.6, "stage_index": 2, "accent": Color("#d6a078"), "unlocked_by_default": false, "enemy_pool": _pool([&"cinder_imp", &"ash_hound", &"ember_beetle", &"fire_witch", &"obsidian_guard"])})
+	maps["black_keep"] = _resource(MAP_DATA, {"id": &"black_keep", "display_name": "Castelo Sem Aurora", "description": "O culto rubro e seus guardas ocupam os salões sem sol.", "theme": &"castle", "duration": 180.0, "boss_id": &"vampire_king", "elite_id": &"dusk_knight", "difficulty": 6.4, "stage_index": 3, "accent": Color("#c897a3"), "unlocked_by_default": false, "enemy_pool": _pool([&"bloodling", &"bat", &"fallen_guard", &"cult_archer", &"blood_mage"])})
+	maps["frostwood"] = _resource(MAP_DATA, {"id": &"frostwood", "display_name": "Bosque da Geada", "description": "Neve cobre as raízes; a matilha branca protege um inverno eterno.", "theme": &"frost", "duration": 188.0, "boss_id": &"frost_guardian", "elite_id": &"frost_brute", "difficulty": 8.5, "stage_index": 4, "accent": Color("#a2c7d0"), "unlocked_by_default": false, "enemy_pool": _pool([&"ice_slime", &"snow_wolf", &"frost_spider", &"ice_archer", &"frost_shaman"])})
+	maps["sunken_mire"] = _resource(MAP_DATA, {"id": &"sunken_mire", "display_name": "Charco Esquecido", "description": "Lama, juncos e esporos ocultam a coroa da rainha anfíbia.", "theme": &"swamp", "duration": 196.0, "boss_id": &"mire_queen", "elite_id": &"mire_titan", "difficulty": 11.0, "stage_index": 5, "accent": Color("#b9c38a"), "unlocked_by_default": false, "enemy_pool": _pool([&"bogling", &"swamp_leech", &"reed_stalker", &"spore_shaman", &"mire_toad"])})
+
+	for stage in maps.values():
+		stage.enemy_pool.append(&"red_orb")
+		stage.enemy_pool.append(&"barrel_beast")
+		if stage.stage_index >= 1: stage.enemy_pool.append(&"demon_a")
+		stage.enemy_pool.append(&"azure_slime")
+		if stage.stage_index >= 1: stage.enemy_pool.append(&"blood_monster")
+		if stage.theme in [&"forest", &"frost", &"swamp"]: stage.enemy_pool.append(&"canarinho")
+		if stage.theme in [&"graveyard", &"castle", &"swamp"]: stage.enemy_pool.append(&"spore_zombie")
 
 # ═══════════════════════════════════════════════════════════
 # WAVES
@@ -446,14 +484,14 @@ func _build_achievements() -> void:
 # ═══════════════════════════════════════════════════════════
 func _build_upgrades() -> void:
 	upgrades = [
-		{"id": "vitality", "name": "Sangue Antigo", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "❤️", "base_cost": 80, "max_level": 70, "stat": "max_health_pct", "value_per_level": 0.001},
-		{"id": "might", "name": "Aço Temperado", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚔️", "base_cost": 95, "max_level": 70, "stat": "damage_pct", "value_per_level": 0.001},
-		{"id": "fortune", "name": "Mão de Mercador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💰", "base_cost": 110, "max_level": 70, "stat": "fortune_pct", "value_per_level": 0.001},
-		{"id": "resilience", "name": "Pele de Pedra", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🛡️", "base_cost": 120, "max_level": 70, "stat": "defense_flat", "value_per_level": 0.001},
-		{"id": "swiftness", "name": "Passos do Vento", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💨", "base_cost": 90, "max_level": 70, "stat": "speed_pct", "value_per_level": 0.001},
-		{"id": "crit_mastery", "name": "Fio do Caos", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🎯", "base_cost": 130, "max_level": 70, "stat": "crit_chance", "value_per_level": 0.001},
-		{"id": "xp_boost", "name": "Memória Ancestral", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "📚", "base_cost": 100, "max_level": 70, "stat": "xp_pct", "value_per_level": 0.001},
-		{"id": "attack_speed", "name": "Ritmo do Predador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚡", "base_cost": 115, "max_level": 70, "stat": "attack_speed_pct", "value_per_level": 0.001},
+		{"id": "vitality", "name": "Sangue Antigo", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "❤️", "base_cost": 80, "max_level": 70, "stat": "max_health_pct", "value_per_level": 0.0002},
+		{"id": "might", "name": "Aço Temperado", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚔️", "base_cost": 95, "max_level": 70, "stat": "damage_pct", "value_per_level": 0.0002},
+		{"id": "fortune", "name": "Mão de Mercador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💰", "base_cost": 110, "max_level": 70, "stat": "fortune_pct", "value_per_level": 0.0002},
+		{"id": "resilience", "name": "Pele de Pedra", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🛡️", "base_cost": 120, "max_level": 70, "stat": "defense_flat", "value_per_level": 0.0002},
+		{"id": "swiftness", "name": "Passos do Vento", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "💨", "base_cost": 90, "max_level": 70, "stat": "speed_pct", "value_per_level": 0.0002},
+		{"id": "crit_mastery", "name": "Fio do Caos", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "🎯", "base_cost": 130, "max_level": 70, "stat": "crit_chance", "value_per_level": 0.0002},
+		{"id": "xp_boost", "name": "Memória Ancestral", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "📚", "base_cost": 100, "max_level": 70, "stat": "xp_pct", "value_per_level": 0.0002},
+		{"id": "attack_speed", "name": "Ritmo do Predador", "desc": "Bônus cumulativo: complete os dez passos de todos os atributos para evoluir o patamar.", "icon": "⚡", "base_cost": 115, "max_level": 70, "stat": "attack_speed_pct", "value_per_level": 0.0002},
 	]
 
 # ═══════════════════════════════════════════════════════════

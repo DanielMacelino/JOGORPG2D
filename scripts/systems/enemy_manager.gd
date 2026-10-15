@@ -30,14 +30,19 @@ func configure(world_root: Node2D, target: SurvivorPlayer, stage: MapData = null
 
 func spawn(kind: StringName, wave: int, forced_position := Vector2.INF) -> ChaserEnemy:
 	var enemy_data: EnemyData = ContentCatalog.enemies.get(str(kind), ContentCatalog.enemies.get("slime"))
-	if enemies.size() >= MAX_ENEMIES and not enemy_data.boss:
+	if enemies.size() >= MAX_ENEMIES and not enemy_data.boss and kind != &"loot_mimic":
 		return null
 	var sovereign := enemy_data.boss and map_data != null and map_data.phase_number == 10
 	if sovereign:
 		enemy_data = enemy_data.duplicate() as EnemyData
 		enemy_data.display_name += " · Soberano"
-	var enemy := preload("res://scripts/world/enemy.gd").new() as ChaserEnemy
+	var enemy: ChaserEnemy = preload("res://scenes/enemies/pixel_enemy.tscn").instantiate() if preload("res://scripts/data/pixel_enemy_sprites.gd").has_kind(kind) else preload("res://scripts/world/enemy.gd").new()
 	enemy.configure(enemy_data, player, wave, map_data.difficulty if map_data != null else 1.0)
+	# Later regions cannot carry first-region fragile fodder into one-hit clears by fresh heroes.
+	if map_data != null and map_data.stage_index >= 1 and not enemy_data.boss:
+		var health_floor := (90.0 + 30.0 * float(map_data.stage_index - 1)) * enemy.wave_scale * CampaignRules.strength(map_data.difficulty_tier, map_data.phase_number)
+		enemy.max_health = maxf(enemy.max_health, health_floor)
+		enemy.health = enemy.max_health
 	if enemy_data.boss and map_data != null and map_data.phase_number == 5:
 		enemy.max_health *= 1.6
 		enemy.health = enemy.max_health
@@ -47,9 +52,10 @@ func spawn(kind: StringName, wave: int, forced_position := Vector2.INF) -> Chase
 		enemy.damage *= 1.30
 		enemy.speed *= 1.08
 	if NetworkSession.running and NetworkSession.hosting:
-		enemy.max_health *= 1.0 + 0.70 * (NetworkSession.players.size() - 1)
+		var party_size := clampi(NetworkSession.players.size(), 1, 4)
+		enemy.max_health *= 1.0 + 0.80 * (party_size - 1)
 		enemy.health = enemy.max_health
-		enemy.damage *= 1.0 + 0.08 * (NetworkSession.players.size() - 1)
+		enemy.damage *= (1.0 + 0.08 * (party_size - 1)) * party_damage_pressure(party_size)
 	var collision := CollisionShape2D.new()
 	var body_shape := CircleShape2D.new()
 	if enemy_data.boss:
@@ -83,6 +89,10 @@ func spawn(kind: StringName, wave: int, forced_position := Vector2.INF) -> Chase
 	enemies.append(enemy)
 	_index_enemy(enemy)
 	return enemy
+
+static func party_damage_pressure(player_count: int) -> float:
+	# Additional damage pressure grows with party size; solo remains unchanged.
+	return 1.0 if player_count <= 1 else 1.0 + 0.10 * clampi(player_count, 2, 4)
 
 func _process(delta: float) -> void:
 	spatial_clock -= delta

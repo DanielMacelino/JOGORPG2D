@@ -50,6 +50,8 @@ func _process(delta: float) -> void:
 			time_in_wave -= wave_duration
 			wave += 1
 			wave_changed.emit(wave)
+			if wave == WAVES_BEFORE_BOSS:
+				spawn_requested.emit(&"loot_mimic", wave)
 			if wave == WAVES_BEFORE_BOSS + 1:
 				boss_spawned = true
 				boss_summoned.emit(map_data.boss_id if map_data != null else &"goblin_king")
@@ -64,6 +66,7 @@ func _process(delta: float) -> void:
 	interval *= density
 	if boss_spawned:
 		interval = (1.1 if map_data != null and map_data.phase_number == 10 else 1.4) * density
+	if map_data != null: interval *= 1.0 - float(map_data.stage_index) * 0.025
 	spawn_clock -= delta
 	if spawn_clock <= 0.0:
 		spawn_clock = interval * rng.randf_range(0.82, 1.18)
@@ -87,6 +90,16 @@ func _roll_enemy() -> StringName:
 	if map_data == null or map_data.enemy_pool.is_empty():
 		return &"slime"
 	var phase := map_data.phase_number
+	if wave >= 2 and rng.randf() < 0.16:
+		var additions: Array[StringName] = []
+		for kind in map_data.enemy_pool:
+			if kind in [&"blood_monster", &"canarinho", &"spore_zombie", &"azure_slime"]: additions.append(kind)
+		if not additions.is_empty(): return additions[rng.randi_range(0, additions.size() - 1)]
+	# Additional shared creatures; the existing regional species retain most spawns.
+	if wave >= 2 and map_data.stage_index >= 1 and rng.randf() < 0.10:
+		return &"demon_a"
+	if wave >= 2 and rng.randf() < 0.12:
+		return &"red_orb" if rng.randf() < 0.6 else &"barrel_beast"
 	# Conjurers threaten a location rather than chasing; their marked areas reward movement.
 	if wave >= 2 and rng.randf() < (0.16 if phase < 5 else 0.23):
 		for kind in map_data.enemy_pool:

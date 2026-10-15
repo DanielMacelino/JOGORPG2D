@@ -7,9 +7,10 @@ var font: Font
 var clock := 0.0
 func _ready() -> void:
 	font = ART.body_font()
-	custom_minimum_size = Vector2(24, 28)
+	custom_minimum_size = Vector2(36, 40)
 	var data: AbilityData = ContentCatalog.abilities[ability_id]
 	tooltip_text = "%s · %s · Nível %d/5" % [data.display_name, {"common":"Básica", "uncommon":"Média", "rare":"Avançada", "epic":"Épica", "legendary":"Lendária", "demigod":"Semideus", "divine":"Deus"}.get(str(data.rarity), "Básica"), rank]
+	tooltip_text += "\n" + data.rank_description(rank)
 func _process(delta: float) -> void:
 	clock += delta
 	queue_redraw()
@@ -18,9 +19,10 @@ func _draw() -> void:
 	if data == null or font == null: return
 	var color: Color = ART.RARITY_COLORS.get(str(data.rarity), ART.GOLD)
 	var special := data.rarity in [&"epic", &"legendary", &"demigod", &"divine"]
-	draw_rect(Rect2(1, 1, 22, 26), Color("#071614", 0.94))
-	draw_rect(Rect2(1, 1, 22, 26), Color(color, 0.8 + sin(clock * 2) * 0.15 if special else 0.65), false, 2 if special else 1)
-	draw_set_transform(Vector2(12, 11), 0, Vector2.ONE * 0.22)
+	draw_rect(Rect2(7, 1, 22, 26), Color("#071614", 0.94))
+	draw_rect(Rect2(7, 1, 22, 26), Color(color, 0.8 + sin(clock * 2) * 0.15 if special else 0.65), false, 2 if special else 1)
+	draw_set_transform(Vector2(18, 11), 0, Vector2.ONE * 0.22)
 	ICON.draw_icon(self, data.visual_id(), Vector2.ZERO, color, special)
 	draw_set_transform(Vector2.ZERO)
-	draw_string(font, Vector2(2, 25), str(rank), HORIZONTAL_ALIGNMENT_CENTER, 20, 8, color)
+	draw_string(font, Vector2(8, 25), str(rank), HORIZONTAL_ALIGNMENT_CENTER, 20, 8, color)
+	draw_string(font, Vector2(0, 38), data.hud_total(rank).replace("até ", ""), HORIZONTAL_ALIGNMENT_CENTER, 36, 8, color)
